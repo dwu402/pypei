@@ -1,3 +1,6 @@
 .vscode/*
 data/*
 out/*
+__pycache__/*
+*.pyc
+*.pyo
