@@ -1,7 +1,7 @@
 from scipy.spatial import distance
 import numpy as np
 
-def find_paried_distances(x, y, size=None, normalised=False):
+def find_paired_distances(x, y, size=None, normalised=False):
     assert len(x) == len(y)
     if size is None:
         size = len(x)//5
