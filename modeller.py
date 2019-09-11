@@ -17,6 +17,8 @@ class Model():
         self.basis_jacobian = None
         self.getx = None
         self.xdash = None
+        self.x_obsv = None
+        self.xdash_obsv = None
         self.model = None
 
         if configuration is not None:
@@ -59,6 +61,11 @@ class Model():
                                     self.xs)
         return self.getx(self.observation_times, *cs)
 
+    def get_x_obsv(self):
+        """ Exposes calculation of trajectory """
+        if self.x_obsv is None:
+            self.x_obsv = ca.substitute(self.xs, [self.ts], [self.observation_times])
+        return self.x_obsv
 
     # We calculate expensive stuff later when called
     def get_basis_jacobian(self):
@@ -74,3 +81,10 @@ class Model():
         if self.xdash is None:
             self.xdash = self.get_basis_jacobian()@ca.hcat(self.cs)
         return self.xdash
+
+    def get_xdash_obsv(self):
+        """ Lazy evaluation of the basis functions at the observable times"""
+        if self.xdash_obsv is None:
+            xdash = self.get_xdash()
+            self.xdash_obsv = ca.substitute(xdash, self.ts, self.observation_times)
+        return self.xdash_obsv

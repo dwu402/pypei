@@ -41,7 +41,21 @@ class Objective():
         self.observation_vector = None
         self.weightings = None
         self.densities = None
-        self.rho = None
+        self.regularisation_vector = 0
+        self.input_list = []
+
+        self.rho = ca.MX.sym('rho')
+        self.alpha = ca.MX.sym('alpha')
+
+        self.obj_1 = None
+        self.obj_2 = None
+        self.regularisation = None
+        self.objective = None
+
+        self.obj_fn_1 = None
+        self.obj_fn_2 = None
+        self.reg_fn = None
+        self.obj_fn = None
 
     def make(self, config, dataset, model):
         """Create the objective function"""
@@ -56,21 +70,34 @@ class Objective():
         self.collocation_matrices = self.colloc_matrices(dataset, model)
         
         self.input_list = [*model.cs, *model.ps]
+        self.objective_input_list = [*self.input_list, self.rho, self.alpha]
 
         self.create_objective(model)
+        self.create_objective_functions()
 
     def create_objective(self, model):
-        self.obj_1 = sum(w * ca.norm_2(self.densities*(ov - (cm@model.xs[j])))**2
+        self.obj_1 = sum(w * ca.norm_fro(self.densities*(ov - (cm@model.get_x_obsv()[j])))**2
                          for j, ov, w, cm in zip(self.observation_vector,
                                                  self.observations,
                                                  self.weightings,
                                                  self.collocation_matrices))
-        self.obj_2 = 
+        self.obj_2 = sum(ca.norm_fro(model.get_xdash_obsv()[:, i] -
+                                      model.model(model.observation_times, *model.cs, *model.ps)[:, i])**2
+                          for i in range(model.s))/model.n
 
+        self.regularisation = ca.norm_fro(ca.vcat(model.ps) - self.regularisation_vector)
+
+        self.objective = self.obj_1 + self.rho*self.obj_2 + self.alpha*self.regularisation
+
+    def create_objective_functions(self):
+        self.obj_fn_1 = ca.Function('fn1', self.input_list, [self.obj_1])
+        self.obj_fn_2 = ca.Function('fn2', self.input_list, [self.obj_2])
+        self.reg_fn = ca.Function('fn3', self.input_list, [self.regularisation])
+        self.obj_fn = ca.Function('objective', self.objective_input_list, [self.objective])
 
     def observations_from_pandas(self, observations, convert=True):
         """Transposes pandas array to numpy array"""
-        arr = np.stack(observations.to_numpy()).T
+        arr = np.stack(np.array(observations)).T
         for arr_row in arr:
             if len(arr_row) < self.m:
                 arr = np.pad(arr, ((0, 0), (0, self.m-len(arr[0]))), 'constant', constant_values=0)
@@ -96,6 +123,21 @@ class Objective():
                     colloc_matrix_numerical[k][i, j] = 1
 
         return colloc_matrix_numerical
+
+class SolveCache():
+    def __init__(self):
+        pass
+
+    def new(self, key, value):
+        pass
+
+class InnerSolver(ca.Callback):
+    def __init__(self, name, opts={}):
+        ca.Callback.__init__(self)
+        self.construct(name, opts)
+    
+    def init(self):
+        self.cache = SolveCache()
 
 class OuterGradient(ca.Callback):
     def __init__(self, name, opts={}):
