@@ -4,3 +4,6 @@ out/*
 __pycache__/*
 *.pyc
 *.pyo
+test__*
+.spyproject/*
+.ipynb_checkpoints/*
