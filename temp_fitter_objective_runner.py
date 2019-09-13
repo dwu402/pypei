@@ -53,10 +53,15 @@ p0 = np.ones(2)
 c0 = [np.ones(13) for _ in range(3)]
 x0 = np.hstack([p0, *c0])
 
-solution = solver(x0=x0, p=[1e-2, 1e-4])
+prange = np.logspace(-6, 6, 50)
+solutions = []
+xguess = x0
+for p in prange:
+    solutions.append(solver(x0=xguess, p=[p, 1e-4], lbx=0))
+    xguess = np.array(solutions[-1]['x']).flatten()
 
-recover_traj = ca.Function('recx', [solver_setup['x']], model.get_x_obsv())
+# recover_traj = ca.Function('recx', [solver_setup['x']], model.get_x_obsv())
 
-plt.plot(model.observation_times, recover_traj(solution['x'])[2])
-plt.plot(sol.t, data, 'o')
-plt.show()
+# plt.plot(model.observation_times, recover_traj(solution['x'])[2])
+# plt.plot(sol.t, data, 'o')
+# plt.show()
