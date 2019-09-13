@@ -2,6 +2,7 @@ import casadi as ca
 import numpy as np
 import pickle
 import modeller
+import copy
 
 def argsplit(arg, n):
     """ Used for splitting the values of c into 3 c vectors for the model """
@@ -65,6 +66,7 @@ class Objective():
         self.observation_vector = np.array(config['observation_vector'])
         self.weightings = np.array(config['weightings'][0])
         self.densities = np.array(config['weightings'][1])
+        self.regularisation_vector = np.array(config['regularisation_vector'])
 
         self.observations = self.observations_from_pandas(dataset['y'])
         self.collocation_matrices = self.colloc_matrices(dataset, model)
@@ -192,3 +194,59 @@ class DirectSolver():
     This is more computationally efficient, since it does not need to 
     make multiple calls to the IPOPT solver for a single theta, but may 
     run into local optima issues"""
+    def __init__(self, config=None):
+        self.models = []
+        self.objectives = []
+        self.solvers = []
+        self.solutions = []
+        self.solve_opts = None
+
+        if config:
+            self.build_models(config)
+            self.build_objectives(config)
+            self.build_solvers()
+            self.prop_solvers(config)
+
+    def build_models(self, config):
+        base_config = copy.copy(config.modelling_configuration)
+        base_config['model'] = config.model
+        base_config['time_span'] = config.time_span
+        for dataset in config.datasets:
+            model_config = base_config
+            model_config['dataset'] = dataset
+            self.models.append(modeller.Model(model_config))
+    
+    def build_objectives(self, config):
+        for model, dataset in zip(self.models, config.datasets):
+            objective = Objective()
+            objective.make(config.fitting_configuration, dataset, model)
+            self.objectives.append(objective)
+
+    def build_solvers(self):
+        for i, objective in enumerate(self.objectives):
+            problem = {
+                'f': objective.objective,
+                'x': ca.vcat(objective.input_list),
+                'p': ca.vcat([objective.rho, objective.alpha])
+            }
+            options = {
+                'ipopt': {
+                    'print_level': 3
+                }
+            }
+            self.solvers.append(ca.nlpsol(f"solver{i}", 'ipopt', problem, options))
+
+    def prep_solvers(self, config):
+        # make x0
+        # setup range of rhos and alphas?
+        self.solve_opts = {
+            'x0' : None,
+            'lbx': 0
+        }
+
+    def solve(self, opts=None, propagate=False):
+        if not opts:
+            opts = self.solve_opts
+        if propagate:
+            opts.extend
+
