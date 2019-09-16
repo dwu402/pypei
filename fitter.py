@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 import modeller
 import copy
+from multiprocessing import Pool
 
 def argsplit(arg, n):
     """ Used for splitting the values of c into 3 c vectors for the model """
@@ -78,7 +79,7 @@ class Objective():
         self.create_objective_functions()
 
     def create_objective(self, model):
-        self.obj_1 = sum(w * ca.norm_fro(self.densities*(ov - (cm@model.get_x_obsv()[j])))**2
+        self.obj_1 = sum(w/len(ov) * ca.norm_fro(self.densities*(ov - (cm@model.get_x_obsv()[j])))**2
                          for j, ov, w, cm in zip(self.observation_vector,
                                                  self.observations,
                                                  self.weightings,
@@ -199,13 +200,13 @@ class DirectSolver():
         self.objectives = []
         self.solvers = []
         self.solutions = []
-        self.solve_opts = None
+        self.process_pool = None
 
         if config:
             self.build_models(config)
             self.build_objectives(config)
-            self.build_solvers()
-            self.prop_solvers(config)
+            self.build_solvers(config)
+            self.prep_pool()
 
     def build_models(self, config):
         base_config = copy.copy(config.modelling_configuration)
@@ -222,8 +223,8 @@ class DirectSolver():
             objective.make(config.fitting_configuration, dataset, model)
             self.objectives.append(objective)
 
-    def build_solvers(self):
-        for i, objective in enumerate(self.objectives):
+    def build_solvers(self, config):
+        for i, (objective, model) in enumerate(zip(self.objectives, self.models)):
             problem = {
                 'f': objective.objective,
                 'x': ca.vcat(objective.input_list),
@@ -234,19 +235,30 @@ class DirectSolver():
                     'print_level': 3
                 }
             }
-            self.solvers.append(ca.nlpsol(f"solver{i}", 'ipopt', problem, options))
+            opts = self.prep_solver(config, model)
+            self.solvers.append((ca.nlpsol(f"solver{i}", 'ipopt', problem, options), 
+                                 opts))
 
-    def prep_solvers(self, config):
-        # make x0
-        # setup range of rhos and alphas?
-        self.solve_opts = {
-            'x0' : None,
+    def prep_solver(self, config, model):
+        c0 = np.ones(model.K*model.s)
+        return {
+            'x0' : np.concatenate([config.initial_parameters, c0]),
             'lbx': 0
         }
 
-    def solve(self, opts=None, propagate=False):
-        if not opts:
-            opts = self.solve_opts
-        if propagate:
-            opts.extend
+    @staticmethod
+    def solve_problem(inputs):
+        solver, opts = inputs
+        return solver(**opts)
 
+    def prep_pool(self, ncpus=2):
+        self.process_pool = Pool(ncpus)
+
+    def solve_problems(self, custom_opts, propagate=False):
+        # reconstruct with custom options
+
+        problems = copy.copy(self.solvers)
+        for problem in problem:
+            problem[1].update(custom_opts)
+
+        self.process_pool.map(self.solve_problem, problems)

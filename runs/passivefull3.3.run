@@ -1,0 +1,3 @@
+mf models/generic_immune_passive_full.py
+cf configurations/passive_full.conf
+df data/auto-got-data-20190701Z181034/mouse3.3.csv
