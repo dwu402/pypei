@@ -43,9 +43,20 @@ class Model():
         basis_fns = casbasis.basis_functions(knots)
         self.basis = ca.vcat([b(self.ts) for b in basis_fns]).reshape((self.n, self.K))
 
+        # define basis matrix and gradient matrix
+        phi = ca.Function('phi', [self.ts], [self.basis])
+        self.phi = np.array(phi(self.observation_times))
+
+        bjac = ca.vcat(
+                   [ca.diag(ca.jacobian(self.basis[:, i], self.ts)) 
+                    for i in range(self.K)]
+               ).reshape((self.n, self.K))
+        self.basis_jacobian = ca.Function('bjac', [self.ts], [bjac])(self.observation_times)
+
         # create the objects that define the smooth, model parameters
         self.cs = [ca.MX.sym("c_"+str(i), self.K, 1) for i in range(self.s)]
-        self.xs = [self.basis@ci for ci in self.cs]
+        self.xs = [self.phi@ci for ci in self.cs]
+        self.xdash = self.basis_jacobian@ca.hcat(self.cs)
         self.ps = [ca.MX.sym("p_"+str(i)) for i in range(n_ps)]
 
         # model function derived from input model function
@@ -57,34 +68,6 @@ class Model():
         """ Exposes calculation of trajectory """
         if self.getx is None:
             self.getx = ca.Function("getx",
-                                    [self.ts, *self.cs],
+                                    [*self.cs],
                                     self.xs)
-        return self.getx(self.observation_times, *cs)
-
-    def get_x_obsv(self):
-        """ Exposes calculation of trajectory """
-        if self.x_obsv is None:
-            self.x_obsv = ca.substitute(self.xs, [self.ts], [self.observation_times])
-        return self.x_obsv
-
-    # We calculate expensive stuff later when called
-    def get_basis_jacobian(self):
-        """ Lazy evaluation of the jacobian of the basis """
-        if self.basis_jacobian is None:
-            self.basis_jacobian = ca.vcat(
-                [ca.diag(ca.jacobian(self.basis[:, i], self.ts)) for i in range(self.K)]
-            ).reshape((self.n, self.K))
-        return self.basis_jacobian
-
-    def get_xdash(self):
-        """ Lazy evaluation of the smooth derivatives """
-        if self.xdash is None:
-            self.xdash = self.get_basis_jacobian()@ca.hcat(self.cs)
-        return self.xdash
-
-    def get_xdash_obsv(self):
-        """ Lazy evaluation of the basis functions at the observable times"""
-        if self.xdash_obsv is None:
-            xdash = self.get_xdash()
-            self.xdash_obsv = ca.substitute(xdash, self.ts, self.observation_times)
-        return self.xdash_obsv
+        return self.getx(*cs)

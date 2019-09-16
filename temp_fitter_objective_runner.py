@@ -34,7 +34,8 @@ config = {
     "weightings":[
         [1]*3,
         [1]*len(sol.t)
-    ]
+    ],
+    "regularisation_vector" : p_true,
 }
 
 model = modeller.Model(config)

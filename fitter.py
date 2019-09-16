@@ -79,12 +79,12 @@ class Objective():
         self.create_objective_functions()
 
     def create_objective(self, model):
-        self.obj_1 = sum(w/len(ov) * ca.norm_fro(self.densities*(ov - (cm@model.get_x_obsv()[j])))**2
+        self.obj_1 = sum(w/len(ov) * ca.norm_fro(self.densities*(ov - (cm@model.xs[j])))**2
                          for j, ov, w, cm in zip(self.observation_vector,
                                                  self.observations,
                                                  self.weightings,
                                                  self.collocation_matrices))
-        self.obj_2 = sum(ca.norm_fro(model.get_xdash_obsv()[:, i] -
+        self.obj_2 = sum(ca.norm_fro(model.xdash[:, i] -
                                       model.model(model.observation_times, *model.cs, *model.ps)[:, i])**2
                           for i in range(model.s))/model.n
 
