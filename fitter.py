@@ -67,7 +67,7 @@ class Objective():
         self.observation_vector = np.array(config['observation_vector'])
         self.weightings = np.array(config['weightings'][0])
         self.densities = np.array(config['weightings'][1])
-        self.regularisation_vector = np.array(config['regularisation_vector'])
+        self.regularisation_vector = np.array(config['regularisation_value'])
 
         self.observations = self.observations_from_pandas(dataset['y'])
         self.collocation_matrices = self.colloc_matrices(dataset, model)
@@ -201,6 +201,7 @@ class DirectSolver():
         self.solvers = []
         self.solutions = []
         self.process_pool = None
+        self.__util_p = None
 
         if config:
             self.build_models(config)
@@ -243,7 +244,6 @@ class DirectSolver():
         c0 = np.ones(model.K*model.s)
         return {
             'x0' : np.concatenate([config.initial_parameters, c0]),
-            'lbx': 0
         }
 
     @staticmethod
@@ -262,3 +262,10 @@ class DirectSolver():
             problem[1].update(custom_opts)
 
         self.process_pool.map(self.solve_problem, problems)
+
+    def getp(self, idx, solution):
+        if self.__util_p is None:
+            self.__util_p = ca.Function('getp', 
+                                        ca.vcat(self.objectives[idx].input_list), 
+                                        self.models[idx].ps)
+        return self.__util_p(solution['x'])
