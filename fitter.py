@@ -79,16 +79,16 @@ class Objective():
         self.create_objective_functions()
 
     def create_objective(self, model):
-        self.obj_1 = sum(w/len(ov) * ca.norm_fro(self.densities*(ov - (cm@model.xs[j])))**2
+        self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*(ov - (cm@model.xs[j])))**2
                          for j, ov, w, cm in zip(self.observation_vector,
                                                  self.observations,
                                                  self.weightings,
                                                  self.collocation_matrices))
-        self.obj_2 = sum(ca.norm_fro(model.xdash[:, i] -
-                                      model.model(model.observation_times, *model.cs, *model.ps)[:, i])**2
+        self.obj_2 = sum(ca.sumsqr(model.xdash[:, i] -
+                                      model.model(model.observation_times, *model.cs, *model.ps)[:, i])
                           for i in range(model.s))/model.n
 
-        self.regularisation = ca.norm_fro(ca.vcat(model.ps) - self.regularisation_vector)
+        self.regularisation = ca.sumsqr(ca.vcat(model.ps) - ca.vcat(self.regularisation_vector))
 
         self.objective = self.obj_1 + self.rho*self.obj_2 + self.alpha*self.regularisation
 
@@ -199,6 +199,7 @@ class DirectSolver():
         self.models = []
         self.objectives = []
         self.solvers = []
+        self.solve_opts = []
         self.solutions = []
         self.process_pool = None
         self.__util_p = None
@@ -212,10 +213,10 @@ class DirectSolver():
     def build_models(self, config):
         base_config = copy.copy(config.modelling_configuration)
         base_config['model'] = config.model
-        base_config['time_span'] = config.time_span
-        for dataset in config.datasets:
+        for dataset, timespan in zip(config.datasets, config.time_span):
             model_config = base_config
             model_config['dataset'] = dataset
+            model_config['time_span'] = timespan
             self.models.append(modeller.Model(model_config))
     
     def build_objectives(self, config):
@@ -229,27 +230,28 @@ class DirectSolver():
             problem = {
                 'f': objective.objective,
                 'x': ca.vcat(objective.input_list),
-                'p': ca.vcat([objective.rho, objective.alpha])
+                'p': ca.vcat([objective.rho, objective.alpha]),
+                'g': ca.vcat(model.ps),
             }
             options = {
                 'ipopt': {
-                    'print_level': 3
-                }
+                    'print_level': 3,
+                },
             }
+            self.solvers.append(ca.nlpsol(f"solver{i}", 'ipopt', problem, options))
             opts = self.prep_solver(config, model)
-            self.solvers.append((ca.nlpsol(f"solver{i}", 'ipopt', problem, options), 
-                                 opts))
+            self.solve_opts.append((i, opts))
 
     def prep_solver(self, config, model):
         c0 = np.ones(model.K*model.s)
         return {
-            'x0' : np.concatenate([config.initial_parameters, c0]),
+            'x0' : np.concatenate([c0, config.initial_parameters]),
         }
 
-    @staticmethod
-    def solve_problem(inputs):
-        solver, opts = inputs
-        return solver(**opts)
+    def solve_problem(self, inputs):
+        idx, opts = inputs
+        res = self.solvers[idx](**opts)
+        return np.array(res['x'])
 
     def prep_pool(self, ncpus=2):
         self.process_pool = Pool(ncpus)
@@ -257,11 +259,11 @@ class DirectSolver():
     def solve_problems(self, custom_opts, propagate=False):
         # reconstruct with custom options
 
-        problems = copy.copy(self.solvers)
-        for problem in problem:
-            problem[1].update(custom_opts)
+        solve_opts = copy.copy(self.solve_opts)
+        for (idx, opt) in solve_opts:
+            opt.update(custom_opts)
 
-        self.process_pool.map(self.solve_problem, problems)
+        return self.process_pool.map(self.solve_problem, solve_opts)
 
     def getp(self, idx, solution):
         if self.__util_p is None:

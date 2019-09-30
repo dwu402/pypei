@@ -105,7 +105,7 @@ def visualise(ax, dataset):
 def knots_from_data(ts, n, dataset):
     """Selects the knots based on data weightings
 
-    If n < number of data points, creates a sparse basis, where the knots are poistioned at the
+    If n < number of data points, creates a sparse basis, where the knots are positioned at the
     points where the 2nd derivative is maximised
 
     If n > number of data points, creates a dense basis. Similar to above, selects points where the
