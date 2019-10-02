@@ -13,6 +13,7 @@ class Model():
         self.K = 0
         self.s = 0
         self.observation_times = None
+        self.basis_fns = None
         self.basis = None
         self.basis_jacobian = None
         self.getx = None
@@ -40,8 +41,8 @@ class Model():
             knots = casbasis.choose_knots(self.observation_times, self.K-2)
         else:
             knots = configuration['knot_function'](self.observation_times, self.K-2, configuration['dataset'])
-        basis_fns = casbasis.basis_functions(knots)
-        self.basis = ca.vcat([b(self.ts) for b in basis_fns]).reshape((self.n, self.K))
+        self.basis_fns = casbasis.basis_functions(knots)
+        self.basis = ca.vcat([b(self.ts) for b in self.basis_fns]).reshape((self.n, self.K))
 
         # define basis matrix and gradient matrix
         phi = ca.Function('phi', [self.ts], [self.basis])

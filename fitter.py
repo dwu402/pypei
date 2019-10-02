@@ -79,7 +79,7 @@ class Objective():
         self.create_objective_functions()
 
     def create_objective(self, model):
-        self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*(ov - (cm@model.xs[j])))**2
+        self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*(ov - (cm@model.cs[j])))**2
                          for j, ov, w, cm in zip(self.observation_vector,
                                                  self.observations,
                                                  self.weightings,
@@ -118,12 +118,11 @@ class Objective():
         This is a matrix, where the time points are mapped onto the finer time grid"""
 
         observation_counts = self.count_observations(dataset['y'])
-        colloc_matrix_numerical = [np.zeros((self.m, model.n)) for i in observation_counts]
+        colloc_matrix_numerical = [np.zeros((self.m, model.K)) for i in observation_counts]
         for k, count in enumerate(observation_counts):
             for i, d_t in enumerate(dataset['t']):
                 if i < count:
-                    j = np.argmin(np.fabs(model.observation_times - d_t))
-                    colloc_matrix_numerical[k][i, j] = 1
+                    colloc_matrix_numerical[k][i, :] = [b(d_t) for b in model.basis_fns]
 
         return colloc_matrix_numerical
 
