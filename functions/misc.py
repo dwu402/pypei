@@ -33,7 +33,7 @@ def knot_fn(ts, n, dataset):
         copies = [int(j) for j in copies]
         # compute the number of knot points in each gap
         kgn = [int(copies[0]-1)]
-        for ci in copies[1:]:
+        for ci in copies[1:-1]:
             m = int(ci//2)
             kgn[-1]+=m
             kgn.append(m)
@@ -43,8 +43,10 @@ def knot_fn(ts, n, dataset):
         keep[-1] = 1
         knots = [times[0]]
         # construct knot locations
-        for gapn, k, x0, x1, c in zip(kgn, keep[1:], times[:-1], times[1:], copies[1:]):
-            lspc = np.linspace(x0, x1, gapn+2)
-            frag = lspc[1:int(gapn+1+k)]
+        for gapn, k0, k1, x0, x1, c in zip(kgn, keep[:-1], keep[1:], times[:-1], times[1:], copies[1:]):
+            step = 2*(x1-x0)/(2*gapn+k0+k1)
+            cands = np.arange(x0-(1-k0)*step/2, x1+(3-k1)*step/2+step, step)
+            frag = cands[1:(gapn+1+k1)]
             knots.extend(frag)
-        return knots
+        return sorted(knots)
+
