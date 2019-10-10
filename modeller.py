@@ -52,7 +52,7 @@ class Model():
                    [ca.diag(ca.jacobian(self.basis[:, i], self.ts)) 
                     for i in range(self.K)]
                ).reshape((self.n, self.K))
-        self.basis_jacobian = ca.Function('bjac', [self.ts], [bjac])(self.observation_times)
+        self.basis_jacobian = np.array(ca.Function('bjac', [self.ts], [bjac])(self.observation_times))
 
         # create the objects that define the smooth, model parameters
         self.cs = [ca.MX.sym("c_"+str(i), self.K, 1) for i in range(self.s)]

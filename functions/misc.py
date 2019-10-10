@@ -45,8 +45,7 @@ def knot_fn(ts, n, dataset):
         # construct knot locations
         for gapn, k0, k1, x0, x1, c in zip(kgn, keep[:-1], keep[1:], times[:-1], times[1:], copies[1:]):
             step = 2*(x1-x0)/(2*gapn+k0+k1)
-            cands = np.arange(x0-(1-k0)*step/2, x1+(3-k1)*step/2+step, step)
+            cands = np.arange(x0-(1-k0)*step/2, x1+(3-k1)*step/2, step)
             frag = cands[1:(gapn+1+k1)]
             knots.extend(frag)
         return sorted(knots)
-
