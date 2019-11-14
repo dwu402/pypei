@@ -1,3 +1,5 @@
-# ca-sh
+# pypei 
 
-## Casadi implemenation of the self-harm repo
+## Python tool for parameter estimation and identifiability
+
+Work in progress
