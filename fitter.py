@@ -84,8 +84,8 @@ class Objective():
                                                  self.observations,
                                                  self.weightings,
                                                  self.collocation_matrices))
-        self.obj_2 = sum(ca.sumsqr(model.xdash[:, i] -
-                                      model.model(model.observation_times, *model.cs, *model.ps)[:, i])
+        self.obj_2 = sum(ca.sumsqr((model.xdash[:, i] -
+                                      model.model(model.observation_times, *model.cs, *model.ps)[:, i]))
                           for i in range(model.s))/model.n
 
         self.regularisation = ca.sumsqr(ca.vcat(model.ps) - ca.vcat(self.regularisation_vector))
