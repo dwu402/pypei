@@ -108,20 +108,15 @@ class Objective():
             arr = np.nan_to_num(arr, copy=True)
         return arr
 
-    def count_observations(self, observations):
-        nparray = self.observations_from_pandas(observations, convert=False)
-        return np.array([len(obs[np.isfinite(obs)]) for obs in nparray])
-
     def colloc_matrices(self, dataset, model):
         """ Generate the matrix that represents the observation model, g
 
         This is a matrix, where the time points are mapped onto the finer time grid"""
 
-        observation_counts = self.count_observations(dataset['y'])
-        colloc_matrix_numerical = [np.zeros((self.m, model.K)) for i in observation_counts]
-        for k, count in enumerate(observation_counts):
+        colloc_matrix_numerical = [np.zeros((self.m, model.K)) for i in range(dataset['y'].shape[-1])]
+        for k, y in enumerate(dataset['y'].T): 
             for i, d_t in enumerate(dataset['t']):
-                if i < count:
+                if not np.isnan(y[i]):
                     colloc_matrix_numerical[k][i, :] = [b(d_t) for b in model.basis_fns]
 
         return colloc_matrix_numerical
