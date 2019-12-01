@@ -44,6 +44,8 @@ class Model():
         self.basis_fns = casbasis.basis_functions(knots)
         self.basis = ca.vcat([b(self.ts) for b in self.basis_fns]).reshape((self.n, self.K))
 
+        self.tssx = ca.SX.sym("t", self.n, 1)
+
         # define basis matrix and gradient matrix
         phi = ca.Function('phi', [self.ts], [self.basis])
         self.phi = np.array(phi(self.observation_times))
@@ -55,14 +57,14 @@ class Model():
         self.basis_jacobian = np.array(ca.Function('bjac', [self.ts], [bjac])(self.observation_times))
 
         # create the objects that define the smooth, model parameters
-        self.cs = [ca.MX.sym("c_"+str(i), self.K, 1) for i in range(self.s)]
+        self.cs = [ca.SX.sym("c_"+str(i), self.K, 1) for i in range(self.s)]
         self.xs = [self.phi@ci for ci in self.cs]
         self.xdash = self.basis_jacobian@ca.hcat(self.cs)
-        self.ps = [ca.MX.sym("p_"+str(i)) for i in range(n_ps)]
+        self.ps = [ca.SX.sym("p_"+str(i)) for i in range(n_ps)]
 
         # model function derived from input model function
         self.model = ca.Function("model",
-                                 [self.ts, *self.cs, *self.ps],
+                                 [self.tssx, *self.cs, *self.ps],
                                  [ca.hcat(configuration['model'](self.ts, self.xs, self.ps))])
 
     def get_x(self, *cs):

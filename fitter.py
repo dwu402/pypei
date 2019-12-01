@@ -46,8 +46,8 @@ class Objective():
         self.regularisation_vector = 0
         self.input_list = []
 
-        self.rho = ca.MX.sym('rho')
-        self.alpha = ca.MX.sym('alpha')
+        self.rho = ca.SX.sym('rho')
+        self.alpha = ca.SX.sym('alpha')
 
         self.obj_1 = None
         self.obj_2 = None
