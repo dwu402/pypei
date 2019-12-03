@@ -40,9 +40,11 @@ class Objective():
         self.m = 0
         self.observations = None
         self.collocation_matrices = None
+        self.observation_model = None
         self.observation_vector = None
         self.weightings = None
         self.densities = None
+        self.regularisation_model = None
         self.regularisation_vector = 0
         self.input_list = []
 
@@ -64,7 +66,12 @@ class Objective():
 
         self.m = len(dataset['t'])
 
-        self.observation_vector = np.array(config['observation_vector'])
+        if 'observation_model' in config:
+            self.observation_model = config['observation_model']
+            self.observation_vector = config['observation_vector']
+        else:
+            self.observation_model = [(lambda t,p,y: y) for _ in config['observation_vector']]
+            self.observation_vector = [[v] for v in config['observation_vector']]
         self.weightings = np.array(config['weightings'][0])
         self.densities = np.array(config['weightings'][1])
         self.regularisation_vector = np.array(config['regularisation_value'])
@@ -79,13 +86,16 @@ class Objective():
         self.create_objective_functions()
 
     def create_objective(self, model):
-        self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*(ov - (cm@model.cs[j])))
-                         for j, ov, w, cm in zip(self.observation_vector,
-                                                 self.observations,
-                                                 self.weightings,
-                                                 self.collocation_matrices))
+        self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*( 
+                            ov - om(model.tssx, model.ps, *(cm@model.cs[j] for j in oj)) 
+                        ))
+                         for om, oj, ov, w, cm in zip(self.observation_model,
+                                                      self.observation_vector,
+                                                      self.observations,
+                                                      self.weightings,
+                                                      self.collocation_matrices))
         self.obj_2 = sum(ca.sumsqr((model.xdash[:, i] -
-                                      model.model(model.observation_times, *model.cs, *model.ps)[:, i]))
+                                    model.model(model.observation_times, *model.cs, *model.ps)[:, i]))
                           for i in range(model.s))/model.n
 
         self.regularisation = ca.sumsqr(ca.vcat(model.ps) - ca.vcat(self.regularisation_vector))
@@ -120,6 +130,7 @@ class Objective():
                     colloc_matrix_numerical[k][i, :] = [b(d_t) for b in model.basis_fns]
 
         return colloc_matrix_numerical
+
 
 class SolveCache():
     def __init__(self):
