@@ -87,7 +87,7 @@ class Objective():
 
     def create_objective(self, model):
         self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*( 
-                            ov - (cm@np.linalg.pinv(model.phi))@om(model.observation_times, model.ps, *(model.xs[j] for j in oj)) 
+                            ov - cm@om(model.observation_times, model.ps, *(model.xs[j] for j in oj)) 
                         ))
                          for om, oj, ov, w, cm in zip(self.observation_model,
                                                       self.observation_vector,
@@ -128,6 +128,7 @@ class Objective():
             for i, d_t in enumerate(dataset['t']):
                 if not np.isnan(y[i]):
                     colloc_matrix_numerical[k][i, :] = [b(d_t) for b in model.basis_fns]
+            colloc_matrix_numerical[k] = colloc_matrix_numerical[k]@np.linalg.pinv(model.phi)
 
         return colloc_matrix_numerical
 
