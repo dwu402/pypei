@@ -76,6 +76,7 @@ class Objective():
         self.densities = np.array(config['weightings'][1])
         self.regularisation_vector = np.array(config['regularisation_value'])
 
+        self.observation_times = np.array(dataset['t'])
         self.observations = self.observations_from_pandas(dataset['y'])
         self.collocation_matrices = self.colloc_matrices(dataset, model)
         
@@ -87,7 +88,8 @@ class Objective():
 
     def create_objective(self, model):
         self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*( 
-                            ov - (cm@np.linalg.pinv(model.phi))@om(model.observation_times, model.ps, *(model.xs[j] for j in oj)) 
+                            ov - om(self.observation_times, model.ps, 
+                                    *(cm@model.cs[j] for j in oj)) 
                         ))
                          for om, oj, ov, w, cm in zip(self.observation_model,
                                                       self.observation_vector,
@@ -98,7 +100,7 @@ class Objective():
                                     model.model(model.observation_times, *model.cs, *model.ps)[:, i]))
                           for i in range(model.s))/model.n
 
-        self.regularisation = ca.sumsqr(ca.vcat(model.ps) - ca.vcat(self.regularisation_vector))
+        self.regularisation = ca.sumsqr((ca.vcat(model.ps) - ca.vcat(self.regularisation_vector))/(1 + ca.vcat(self.regularisation_vector)))
 
         self.objective = self.obj_1 + self.rho*self.obj_2 + self.alpha*self.regularisation
 
