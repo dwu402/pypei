@@ -88,8 +88,10 @@ class Objective():
 
     def create_objective(self, model):
         self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*( 
-                            ov - om(self.observation_times, model.ps, 
-                                    *(cm@model.cs[j] for j in oj)) 
+                            ov - ca.interp1d(model.observation_times,
+                            om(model.observation_times, model.ps, 
+                               *(model.xs[j] for j in oj)),
+                            self.observation_times)
                         ))
                          for om, oj, ov, w, cm in zip(self.observation_model,
                                                       self.observation_vector,

@@ -65,7 +65,7 @@ class Model():
         # model function derived from input model function
         self.model = ca.Function("model",
                                  [self.tssx, *self.cs, *self.ps],
-                                 [ca.hcat(configuration['model'](self.ts, self.xs, self.ps))])
+                                 [ca.hcat(configuration['model'](self.tssx, self.xs, self.ps))])
 
     def get_x(self, *cs):
         """ Exposes calculation of trajectory """
