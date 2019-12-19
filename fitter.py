@@ -88,7 +88,7 @@ class Objective():
 
     def create_objective(self, model):
         self.obj_1 = sum(w/len(ov) * ca.sumsqr(self.densities*( 
-                            ov - ca.interp1d(model.observation_times,
+                            ov - cm@ca.interp1d(model.observation_times,
                             om(model.observation_times, model.ps, 
                                *(model.xs[j] for j in oj)),
                             self.observation_times)
@@ -127,11 +127,15 @@ class Objective():
 
         This is a matrix, where the time points are mapped onto the finer time grid"""
 
-        colloc_matrix_numerical = [np.zeros((self.m, model.K)) for i in range(dataset['y'].shape[-1])]
-        for k, y in enumerate(dataset['y'].T): 
-            for i, d_t in enumerate(dataset['t']):
-                if not np.isnan(y[i]):
-                    colloc_matrix_numerical[k][i, :] = [b(d_t) for b in model.basis_fns]
+        # colloc_matrix_numerical = [np.zeros((self.m, model.K)) for i in range(dataset['y'].shape[-1])]
+        # for k, y in enumerate(dataset['y'].T): 
+        #     for i, d_t in enumerate(dataset['t']):
+        #         if not np.isnan(y[i]):
+        #             colloc_matrix_numerical[k][i, :] = [b(d_t) for b in model.basis_fns]
+
+        is_not_nan = lambda x: not np.isnan(x)
+        not_nan = [list(map(float, map(is_not_nan, yi))) for yi in dataset['y'].T]
+        colloc_matrix_numerical = list(map(np.diag, not_nan))
 
         return colloc_matrix_numerical
 
