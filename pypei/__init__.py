@@ -1,1 +1,2 @@
-from . import modeller, fitter, functions
+from . import modeller, objective, fitter
+from . import functions
