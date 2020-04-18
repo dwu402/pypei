@@ -36,7 +36,7 @@ class Model():
         self.observation_times = np.linspace(*configuration['time_span'][:2], self.n)
 
         # determine knots and build basis functions
-        if configuration['knot_function'] is None:
+        if 'knot_function' not in configuration or configuration['knot_function'] is None:
             knots = casbasis.choose_knots(self.observation_times, self.K-2)
         else:
             knots = configuration['knot_function'](self.observation_times, self.K-2, configuration['dataset'])
@@ -57,14 +57,15 @@ class Model():
 
         # create the objects that define the smooth, model parameters
         self.cs = [ca.SX.sym("c_"+str(i), self.K, 1) for i in range(self.s)]
-        self.xs = [self.phi@ci for ci in self.cs]
+        self._xs = [self.phi@ci for ci in self.cs]
+        self.xs = ca.hcat(self._xs)
         self.xdash = self.basis_jacobian@ca.hcat(self.cs)
         self.ps = [ca.SX.sym("p_"+str(i)) for i in range(n_ps)]
 
         # model function derived from input model function
         self.model = ca.Function("model",
                                  [self.tssx, *self.cs, *self.ps],
-                                 [ca.hcat(configuration['model'](self.tssx, self.xs, self.ps))])
+                                 [ca.hcat(configuration['model'](self.tssx, self._xs, self.ps))])
 
     def get_x(self, *cs):
         """ Exposes calculation of trajectory """
