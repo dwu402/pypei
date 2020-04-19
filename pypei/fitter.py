@@ -41,13 +41,17 @@ class Solver():
         )
 
     def __call__(self, *args, **kwargs):
-        return self.solve(*args, **kwargs)
-
-    def solve(self, *args, **kwargs):
-        return self.solver.solve(*args, **kwargs)
+        return self.solver(*args, **kwargs)
 
     @staticmethod
     def make_config(model, objective):
+        """ Generates the default solver configuration
+
+        x, Decision variables: [c, p] which are the spline coefficients and model parameters
+        f, Objective Function: from objective object
+        g, Constraints: On the state variables (e.g. for non-negativity)
+        p, Parameters: L matrices and data
+        """
         return {
             'x': ca.vcat([*model.cs, *model.ps]),
             'f': objective.objective_function,
@@ -55,12 +59,21 @@ class Solver():
             'p': ca.vcat(util.flat_squash(*objective.Ls,*objective.y0s))
         }
 
-    @staticmethod
-    def form_p(Ls, y0s):
-        pass
+    def prep_p_former(self, objective):
+        self._p_former = ca.Function('p_former', objective.Ls + objective.y0s, 
+                                     [ca.vcat(util.flat_squash(*objective.Ls,*objective.y0s))])
+
+    def form_p(self, Ls, y0s):
+        """ Combines inputs for L matrices and data for use in the solver
+        """
+        return self._p_former(*Ls, *y0s)
 
     @staticmethod
     def proto_x0(model):
+        """ Generates initial iterates for the decision variables x = [c, p]
+
+        This returns all ones of the correct shape, which can be further manipulated.
+        """
         return {
             'x0': np.ones(ca.vcat([*model.cs, *model.ps]).shape),
             'c0': np.ones(ca.vcat(model.cs).shape),

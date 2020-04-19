@@ -85,14 +85,18 @@ solver.make(solver_config)
 
 # initial interate
 proto_x0 = solver.proto_x0(model)
+# for all ones
+# x0 = proto_x0['x0'] 
 x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1/10000, 1]).T])
 
 # parameters (L matrices and data)
-p = solver.form_p([1/2., 1/1.], data_pd)
+solver.prep_p_former(objective)
+# equivalent to lambda = 2
+p = solver.form_p([1/2., 1/1.], [data_pd.T.flatten(), np.zeros((400,1))])
 
 # bounds on decision variables
 # non-negative model parameters
-lbx = np.concatenate([proto_x0['c0']*-np.inf, [0, 0]])
+lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0]]])
 
 # solve
-solver.solve(x0, p=p, lbx=lbx, lbg=0)
+mle_estimate = solver.solver(x0=x0, p=p, lbx=lbx, lbg=0)
