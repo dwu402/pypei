@@ -19,16 +19,27 @@ class Objective():
 
     @staticmethod
     def _DATAFIT(model, obsv_fn=lambda x:x):
+        """ Default data fit objective value
+
+        Assuming form ||y_0 - g(x)||^2, returns g(x)
+        """
         return obsv_fn(model.xs).reshape((-1,1))
 
     @staticmethod
     def _MODELFIT(model):
+        """ Default model fit objective value
+
+        Assuming form ||Dx- f(x,p)||^2, returns Dx-f(x,p)
+        """
         return (model.xdash - model.model(model.observation_times, 
                                           *model.cs, *model.ps)
                ).reshape((-1,1))
 
     @staticmethod
     def _autoconfig_data(data: np.array, select: list=None) -> (dict, np.array):
+        """ Generates objective config components for data 
+        
+        Creates an observation function that removes effects of nans in data"""
         config = {'sz': data.shape}
         if not select:
             config['obs_fn'] = lambda x: (1-np.isnan(data).astype(float)) * x
@@ -38,20 +49,24 @@ class Objective():
 
     @staticmethod
     def _autoconfig_L(data):
+        """ Generates default configuration for L matrix
+
+        Default L matrix is of form 1/sigma * I
+        """
         config = {'n': np.prod(data.shape), 'diag': True}
         return config
 
     def make(self, config):
         assert len(config['L']) == len(config['Y'])
         for i, L in enumerate(config['L']):
-            if not L['diag']:
-                Lobj = ca.SX.sym(f'L_{i}', L['n'], L['n'])
-                self.Ls.append(Lobj)
-                self._Ls.append(Lobj)
-            else:
+            if 'diag' in L and L['diag']:
                 Lobj = ca.SX.sym(f'L_{i}')
                 self.Ls.append(Lobj)
                 self._Ls.append(ca.SX.eye(L['n'])*Lobj)
+            else:
+                Lobj = ca.SX.sym(f'L_{i}', L['n'], L['n'])
+                self.Ls.append(Lobj)
+                self._Ls.append(Lobj)
         for i, Y in enumerate(config['Y']):
             self.y0s.append(ca.SX.sym(f'Y0_{i}', *Y['sz']))
             self.ys.append(Y['obs_fn'])
