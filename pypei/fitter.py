@@ -18,6 +18,8 @@ class Solver():
         }
         self.solve_opts = self.__default_solve_opts__
 
+        self.profilers = []
+
         if config:
             self.make(config)
 
@@ -79,3 +81,21 @@ class Solver():
             'c0': np.ones(ca.vcat(model.cs).shape),
             'p0': np.ones(ca.vcat(model.ps).shape)
         }
+
+    @staticmethod
+    def make_profiler_configs(model):
+        return [{'g+': p} for p in model.ps]
+
+    def make_profilers(self, configs):
+        for config in configs:
+            profile_constraint = ca.vcat([self.constraints, config['g+']])
+            self.profilers.append(
+                ca.nlpsol('solver', 'ipopt',
+                        {
+                            'x': self.decision_vars,
+                            'f': self.objective_function,
+                            'g': profile_constraint,
+                            'p': self.parameters,
+                        },
+                        self.solve_opts)
+            )

@@ -1,7 +1,6 @@
 import pypei
 
 import numpy as np
-from matplotlib import pyplot as plt
 from scipy.integrate import solve_ivp
 import casadi as ca
 
@@ -100,3 +99,18 @@ lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0]]])
 
 # solve
 mle_estimate = solver.solver(x0=x0, p=p, lbx=lbx, lbg=0)
+
+# profile likelihood for parameter uncertainty
+profiler_configs = solver.make_profiler_configs(model)
+solver.make_profilers(profiler_configs)
+
+# TODO: profiling config and run
+
+# predictive uncertainty
+resample_config = dict()
+resample_sols = []
+resamples = pypei.util.resample_data(data_pd, resample_config, n=50)
+for resample in resamples:
+    p = solver.form_p([1/2., 1/1.], [resample.T.flatten(), np.zeros((400,1))])
+    resample_sols.append(solver.solver(x0=x0, p=p, lbx=lbx, lbg=0))
+

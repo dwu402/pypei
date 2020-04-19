@@ -36,3 +36,6 @@ def flat_squash(*args):
         arg.reshape((-1,1)) for arg in args
     ]
 
+def resample_data(data, config, n=1):
+    # TODO
+    return []

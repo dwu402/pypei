@@ -72,4 +72,3 @@ class Objective():
             self.ys.append(Y['obs_fn'])
         self.objective_function = sum(ca.sumsqr(L@(y0-y))/L.shape[0]
                                       for L, y0, y in zip(self._Ls, self.y0s, self.ys))
-
