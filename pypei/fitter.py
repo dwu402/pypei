@@ -100,19 +100,30 @@ class Solver():
                         self.solve_opts)
             )
 
-    @staticmethod
-    def profile_bound_range(profiler, mle):
-        pass
+    def profile(self, mle, p=None, lbx=-np.inf, ubx=np.inf, lbg=-np.inf, ubg=np.inf, pbounds=None):
+        profiles = []
+        if not pbounds:
+            pbounds = [self.profile_bound_range(profiler, mle) for profiler in self.profilers]
+        for profiler, bound_range in zip(self.profilers, pbounds):
+            profile = []
+            for prfl_p in bound_range:
+                plbg, pubg = self.profile_set_g(profiler, prfl_p, lbg_v=0)
+                profile.append(profiler(x0=mle['x'], p=p, lbx=lbx, ubx=ubx, lbg=plbg, ubg=pubg))
+            profiles.append(profile)
+        return profiles
 
     @staticmethod
-    def profile_bounds(profiler_fn, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
+    def profile_bound_range(profiler, mle):
+        return []
+
+    @staticmethod
+    def profile_set_g(profiler_fn, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
         gsz = profiler_fn.size_in(2) # exploiting structure of Casadi.IpoptInterface
         lbg = np.ones(gsz)*lbg_v
         ubg = np.ones(gsz)*ubg_v
         lbg[-1] = bnd_value
         ubg[-1] = bnd_value
         return lbg, ubg
-
 
     def get_parameters(self, solution, model):
         return ca.Function('pf', [self.decision_vars], model.ps)(solution['x'])

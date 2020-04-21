@@ -130,13 +130,7 @@ profiler_configs = solver.make_profiler_configs(model)
 solver.make_profilers(profiler_configs)
 
 # run profilers
-profiles = []
-for profiler in solver.profilers:
-    profile = []
-    for prfl_p in solver.profile_bound_range(profiler, mle_estimate):
-        plbg, pubg = solver.profile_bounds(profiler, prfl_p, lbg_v=0)
-        profile.append(profiler(x0=mle_estimate['x'], p=p, lbx=lbx, ubx=ubx, lbg=plbg, ubg=pubg))
-    profiles.append(profile)
+profiles = solver.profile(mle=mle_estimate, p=p, lbx=lbx, ubx=ubx, lbg=0)
 
 # predictive uncertainty
 resample_config = dict()
