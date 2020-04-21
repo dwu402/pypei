@@ -4,8 +4,15 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import casadi as ca
 
+from matplotlib import pyplot as plt
+
+# Flags for future
+known_initial_susceptible_size = True
+visualise_mle = False
+
+
 # creation of synthetic underlying truth
-p_true = [0.75/10000, 0.075]
+p_true = [0.6/10000, 0.15]
 y0_true = [10000, 1]
 tspan = [0, 50]
 
@@ -23,9 +30,9 @@ def observation_function(y):
     return y[0,0] - y[:,0]
 
 # construting the data
-data_t = np.linspace(0, 30, 11)
+data_t = np.linspace(0, 25, 13)
 data_y = observation_function(sol_true.sol(data_t).T)
-data = data_y + np.random.randn(*data_y.shape)*100
+data = data_y + np.random.randn(*data_y.shape)*1000
 # non-negative
 data[data < 0] = 0
 # strictly increasing
@@ -65,9 +72,9 @@ objective_config = {
             'obs_fn':objective._DATAFIT(model, data_obsv_fn),
         },
         {
-            'sz': (np.prod(model.xs.shape),1),
-            'obs_fn': objective._MODELFIT(model).reshape((-1,1)),
-        }
+            'sz': 0,
+            'obs_fn': objective._MODELFIT(model),
+        },
     ],
     'L': [
         objective._autoconfig_L(data_pd),
@@ -90,27 +97,52 @@ x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1/10000, 1]).T])
 
 # parameters (L matrices and data)
 solver.prep_p_former(objective)
-# equivalent to lambda = 2
-p = solver.form_p([1/2., 1/1.], [data_pd.T.flatten(), np.zeros((400,1))])
+# equivalent to lambda = 2e2
+p = solver.form_p([1/2., 10.], [data_pd.T.flatten(), 0])
 
 # bounds on decision variables
 # non-negative model parameters
 lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0]]])
+ubx = proto_x0['x0']*np.inf
+
+# specify ics if known
+if known_initial_susceptible_size:
+    lbx[0] = y0_true[0]
+    ubx[0] = y0_true[0]
 
 # solve
-mle_estimate = solver.solver(x0=x0, p=p, lbx=lbx, lbg=0)
+mle_estimate = solver.solver(x0=x0, p=p, lbx=lbx, ubx=ubx, lbg=0)
+
+# visualise mle solution
+if visualise_mle:
+    print(solver.get_parameters(mle_estimate, model))
+    print(p_true)
+
+    plt.plot(model.observation_times, solver.get_state(mle_estimate, model))
+    plt.plot(model.observation_times, observation_function(solver.get_state(mle_estimate, model)))
+    plt.plot(data_t, data_y, 'x')
+    plt.plot(sol_true.t, sol_true.y.T, 'o')
+    plt.plot(sol_true.t, observation_function(sol_true.y.T), 'o')
+    plt.show()
 
 # profile likelihood for parameter uncertainty
 profiler_configs = solver.make_profiler_configs(model)
 solver.make_profilers(profiler_configs)
 
-# TODO: profiling config and run
+# run profilers
+profiles = []
+for profiler in solver.profilers:
+    profile = []
+    for prfl_p in solver.profile_bound_range(profiler, mle_estimate):
+        plbg, pubg = solver.profile_bounds(profiler, prfl_p, lbg_v=0)
+        profile.append(profiler(x0=mle_estimate['x'], p=p, lbx=lbx, ubx=ubx, lbg=plbg, ubg=pubg))
+    profiles.append(profile)
 
 # predictive uncertainty
 resample_config = dict()
 resample_sols = []
 resamples = pypei.util.resample_data(data_pd, resample_config, n=50)
 for resample in resamples:
-    p = solver.form_p([1/2., 1/1.], [resample.T.flatten(), np.zeros((400,1))])
-    resample_sols.append(solver.solver(x0=x0, p=p, lbx=lbx, lbg=0))
+    p = solver.form_p([1/2., 1/1.], [resample.T.flatten(), 0])
+    # resample_sols.append(solver.solver(x0=x0, p=p, lbx=lbx, lbg=0))
 

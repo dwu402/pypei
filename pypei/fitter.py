@@ -99,3 +99,23 @@ class Solver():
                         },
                         self.solve_opts)
             )
+
+    @staticmethod
+    def profile_bound_range(profiler, mle):
+        pass
+
+    @staticmethod
+    def profile_bounds(profiler_fn, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
+        gsz = profiler_fn.size_in(2) # exploiting structure of Casadi.IpoptInterface
+        lbg = np.ones(gsz)*lbg_v
+        ubg = np.ones(gsz)*ubg_v
+        lbg[-1] = bnd_value
+        ubg[-1] = bnd_value
+        return lbg, ubg
+
+
+    def get_parameters(self, solution, model):
+        return ca.Function('pf', [self.decision_vars], model.ps)(solution['x'])
+
+    def get_state(self, solution, model):
+        return ca.Function('xf', [self.decision_vars], [model.xs])(solution['x'])

@@ -68,7 +68,10 @@ class Objective():
                 self.Ls.append(Lobj)
                 self._Ls.append(Lobj)
         for i, Y in enumerate(config['Y']):
-            self.y0s.append(ca.SX.sym(f'Y0_{i}', *Y['sz']))
+            if Y['sz'] == 0:
+                self.y0s.append(ca.SX.sym(f'Y0_{i}'))
+            else:
+                self.y0s.append(ca.SX.sym(f'Y0_{i}', *Y['sz']))
             self.ys.append(Y['obs_fn'])
         self.objective_function = sum(ca.sumsqr(L@(y0-y))/L.shape[0]
                                       for L, y0, y in zip(self._Ls, self.y0s, self.ys))
