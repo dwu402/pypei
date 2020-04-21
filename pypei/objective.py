@@ -57,21 +57,62 @@ class Objective():
         return config
 
     def make(self, config):
+        """ Make the objective function given the configuration options
+
+        The configuration consists of two keys: Y and L, which configure
+        the data based objects and L matrices respectively
+
+        The objective function is of the form
+        $$
+        H(x|L, y_0) = \sum_{i=0}^{N} || L_i({y_0}_i - f_i(x)) ||^2
+        $$
+
+        $L_i$ is further assumed to have the form:
+        $$
+        L_i = L_FL_D(x)
+        $$
+        where $L_F$ is a fixed portion and $L_D$ is an x-dependent portion
+
+        Configuration Options
+        ---------------------
+        Y
+
+        sz: (tuple of floats) Size of the data (m,n)
+        obs_fn:  casadi object representing f_i(x)
+
+        L
+
+        depx: (bool) whether or not L has an x-dependent portion
+        x: the form on $L_D(x)$. Required if depx is True
+        iden: (bool) whether or not $L_F$ is identity, overrides diag option below
+        diag: (bool) whether or not $L_F$ takes the form $L_F = s*I$
+        n: (int) size of $L_F$
+        """
         assert len(config['L']) == len(config['Y'])
+        # create L matrix symbolics
         for i, L in enumerate(config['L']):
+            if 'depx' in L and L['depx'] and 'x' in L:
+                L_base = L['x']
+            else:
+                L_base = ca.SX.eye(L['n'])
+            if "iden" in L and L['iden']:
+                self._Ls.append(L_base)
+                continue
             if 'diag' in L and L['diag']:
                 Lobj = ca.SX.sym(f'L_{i}')
                 self.Ls.append(Lobj)
-                self._Ls.append(ca.SX.eye(L['n'])*Lobj)
+                self._Ls.append(L_base@Lobj)
             else:
                 Lobj = ca.SX.sym(f'L_{i}', L['n'], L['n'])
-                self.Ls.append(Lobj)
-                self._Ls.append(Lobj)
+                self.Ls.append(L_base@Lobj)
+                self._Ls.append(L_base@Lobj)
+        # create Y0 (data) symbolics and Y symbolics
         for i, Y in enumerate(config['Y']):
             if Y['sz'] == 0:
                 self.y0s.append(ca.SX.sym(f'Y0_{i}'))
             else:
                 self.y0s.append(ca.SX.sym(f'Y0_{i}', *Y['sz']))
             self.ys.append(Y['obs_fn'])
+        # assemble objective function
         self.objective_function = sum(ca.sumsqr(L@(y0-y))/L.shape[0]
                                       for L, y0, y in zip(self._Ls, self.y0s, self.ys))

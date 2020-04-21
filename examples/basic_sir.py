@@ -97,7 +97,7 @@ x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1/10000, 1]).T])
 
 # parameters (L matrices and data)
 solver.prep_p_former(objective)
-# equivalent to lambda = 2e2
+# equivalent to lambda = 2e1
 p = solver.form_p([1/2., 10.], [data_pd.T.flatten(), 0])
 
 # bounds on decision variables
