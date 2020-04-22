@@ -1,8 +1,10 @@
+""" Interface for CasADi B Spline basis creation """
 import numpy as np
 import casadi as ca
 from .functions import casbasis
 
 class Model():
+    """ B-spline basis representation of state """
     def __init__(self, configuration=None):
         self.ts = None
         self.cs = None
@@ -50,9 +52,9 @@ class Model():
         self.phi = np.array(phi(self.observation_times))
 
         bjac = ca.vcat(
-                   [ca.diag(ca.jacobian(self.basis[:, i], self.ts)) 
-                    for i in range(self.K)]
-               ).reshape((self.n, self.K))
+            [ca.diag(ca.jacobian(self.basis[:, i], self.ts))
+             for i in range(self.K)]
+            ).reshape((self.n, self.K))
         self.basis_jacobian = np.array(ca.Function('bjac', [self.ts], [bjac])(self.observation_times))
 
         # create the objects that define the smooth, model parameters

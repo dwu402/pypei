@@ -1,7 +1,9 @@
+from scipy.linalg import block_diag as bd
 import numpy as np
+import casadi as ca
 
 def knot_fn(ts, n, dataset):
-    """ A curvature based knot location selection function 
+    """ A curvature based knot location selection function
     Inputs:
     ts - fine time grid
     n - number of knots
@@ -18,7 +20,7 @@ def knot_fn(ts, n, dataset):
         temp_knots = importance[:n]
         if 0 in temp_knots:
             temp_knots.remove(0)
-        if (ntimes-1) in temp_knots:
+        if ntimes-1 in temp_knots:
             temp_knots.remove(ntimes-1)
         knot_indices = [0] + sorted(temp_knots[:n-2]) + [-1]
 
@@ -35,9 +37,9 @@ def knot_fn(ts, n, dataset):
         kgn = [int(copies[0]-1)]
         for ci in copies[1:-1]:
             m = int(ci//2)
-            kgn[-1]+=m
+            kgn[-1] += m
             kgn.append(m)
-        kgn[-1]+=copies[-1]-1
+        kgn[-1] += copies[-1]-1
         # select knots to keep, always keep end knots
         keep = [int(ci%2) for ci in copies]
         keep[-1] = 1
@@ -49,3 +51,39 @@ def knot_fn(ts, n, dataset):
             frag = cands[1:(gapn+1+k1)]
             knots.extend(frag)
         return sorted(knots)
+
+def block_diag(block_size, weights, casadi=False):
+    """ Creates a diagonal matrix where block_size entries are identical
+
+    Input
+    -----
+    block_size: size of a single block
+    weights: list of length n, values of block entries
+    casadi: whether to use CasAdi SX symbolics instead of numpy
+
+    Example
+    -------
+    block_diag(3, [1, 2])
+    >>> np.array([
+        [1, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 0, 2, 0, 0],
+        [0, 0, 0, 0, 2, 0],
+        [0, 0, 0, 0, 0, 2]
+        ])
+    """
+    if not casadi:
+        eye = np.eye(block_size)
+    else:
+        eye = ca.SX.eye(block_size)
+    return bd([eye*w for w in weights])
+
+def flat_squash(*args):
+    return [
+        arg.reshape((-1, 1)) for arg in args
+    ]
+
+def resample_data(data, config, n=1):
+    # TODO
+    return []

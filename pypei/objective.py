@@ -1,8 +1,6 @@
-import copy
-import casadi as ca
+""" Interface for creating CasADi symbolics for weighted least squares """
 import numpy as np
-from . import util
-from . import modeller
+import casadi as ca
 
 class Objective():
     """ Contains the objective function """
@@ -18,12 +16,12 @@ class Objective():
             self.make(config)
 
     @staticmethod
-    def _DATAFIT(model, obsv_fn=lambda x:x):
+    def _DATAFIT(model, obsv_fn=lambda x: x):
         """ Default data fit objective value
 
         Assuming form ||y_0 - g(x)||^2, returns g(x)
         """
-        return obsv_fn(model.xs).reshape((-1,1))
+        return obsv_fn(model.xs).reshape((-1, 1))
 
     @staticmethod
     def _MODELFIT(model):
@@ -33,10 +31,10 @@ class Objective():
         """
         return (model.xdash - model.model(model.observation_times, 
                                           *model.cs, *model.ps)
-               ).reshape((-1,1))
+               ).reshape((-1, 1))
 
     @staticmethod
-    def _autoconfig_data(data: np.array, select: list=None) -> (dict, np.array):
+    def _autoconfig_data(data: np.array, select: list = None) -> (dict, np.array):
         """ Generates objective config components for data
 
         Creates an observation function that removes effects of nans in data"""
@@ -44,7 +42,7 @@ class Objective():
         if not select:
             config['obs_fn'] = lambda x: (1-np.isnan(data).astype(float)) * x
         else:
-            config['obs_fn'] = lambda x: ((1-np.isnan(data).astype(float)) * x)[:,select]
+            config['obs_fn'] = lambda x: ((1-np.isnan(data).astype(float)) * x)[:, select]
         return config
 
     @staticmethod
@@ -64,7 +62,7 @@ class Objective():
 
         The objective function is of the form
         $$
-        H(x|L, y_0) = \sum_{i=0}^{N} || L_i({y_0}_i - f_i(x)) ||^2
+        H(x|L, y_0) = \\sum_{i=0}^{N} || L_i({y_0}_i - f_i(x)) ||^2
         $$
 
         $L_i$ is further assumed to have the form:
@@ -119,3 +117,7 @@ class Objective():
         # assemble objective function
         self.objective_function = sum(ca.sumsqr(L@(y0-y))
                                       for L, y0, y in zip(self._Ls, self.y0s, self.ys))
+
+    def obj_fn(self, i):
+        """ Returns the nth objective function object """
+        return ca.sumsqr(self._Ls[i]@(self.y0s[i]-self.ys[i]))

@@ -128,7 +128,7 @@ if visualise_mle:
     plt.show()
 
 # profile likelihood for parameter uncertainty
-profiler_configs = solver.make_profiler_configs(model)
+profiler_configs = solver._profiler_configs(model)
 solver.make_profilers(profiler_configs)
 
 # run profilers
@@ -137,7 +137,7 @@ profiles = solver.profile(mle=mle_estimate, p=p, lbx=lbx, ubx=ubx, lbg=0)
 # predictive uncertainty
 resample_config = dict()
 resample_sols = []
-resamples = pypei.util.resample_data(data_pd, resample_config, n=50)
+resamples = pypei.functions.misc.resample_data(data_pd, resample_config, n=50)
 for resample in resamples:
     p = solver.form_p([1/2., 1/1.], [resample.T.flatten(), 0])
     # resample_sols.append(solver.solver(x0=x0, p=p, lbx=lbx, lbg=0))
