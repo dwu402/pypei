@@ -8,11 +8,11 @@ from matplotlib import pyplot as plt
 
 # Flags for future
 known_initial_susceptible_size = True
-visualise_mle = False
+visualise_mle = True
 
 
 # creation of synthetic underlying truth
-p_true = [0.6/10000, 0.15]
+p_true = [0.6/10000, 0.25]
 y0_true = [10000, 1]
 tspan = [0, 50]
 
@@ -30,9 +30,9 @@ def observation_function(y):
     return y[0,0] - y[:,0]
 
 # construting the data
-data_t = np.linspace(0, 25, 13)
+data_t = np.linspace(0, 28, 15)
 data_y = observation_function(sol_true.sol(data_t).T)
-data = data_y + np.random.randn(*data_y.shape)*1000
+data = data_y + np.random.randn(*data_y.shape)*100
 # non-negative
 data[data < 0] = 0
 # strictly increasing
@@ -97,8 +97,7 @@ x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1/10000, 1]).T])
 
 # parameters (L matrices and data)
 solver.prep_p_former(objective)
-# equivalent to lambda = 2e1
-p = solver.form_p([1/2., 10.], [data_pd.T.flatten(), 0])
+p = solver.form_p([1/2., 0.], [data_pd.T.flatten(), 0])
 
 # bounds on decision variables
 # non-negative model parameters
@@ -120,9 +119,12 @@ if visualise_mle:
 
     plt.plot(model.observation_times, solver.get_state(mle_estimate, model))
     plt.plot(model.observation_times, observation_function(solver.get_state(mle_estimate, model)))
+    plt.plot(data_t, data_obsv_fn(solver.get_state(mle_estimate, model)))
+    plt.plot(data_t, data_pd, 'v')
     plt.plot(data_t, data_y, 'x')
     plt.plot(sol_true.t, sol_true.y.T, 'o')
     plt.plot(sol_true.t, observation_function(sol_true.y.T), 'o')
+    plt.ylim([0, 15000])
     plt.show()
 
 # profile likelihood for parameter uncertainty
@@ -139,4 +141,3 @@ resamples = pypei.util.resample_data(data_pd, resample_config, n=50)
 for resample in resamples:
     p = solver.form_p([1/2., 1/1.], [resample.T.flatten(), 0])
     # resample_sols.append(solver.solver(x0=x0, p=p, lbx=lbx, lbg=0))
-
