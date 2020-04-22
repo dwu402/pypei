@@ -37,8 +37,8 @@ class Objective():
 
     @staticmethod
     def _autoconfig_data(data: np.array, select: list=None) -> (dict, np.array):
-        """ Generates objective config components for data 
-        
+        """ Generates objective config components for data
+
         Creates an observation function that removes effects of nans in data"""
         config = {'sz': data.shape}
         if not select:
@@ -53,7 +53,7 @@ class Objective():
 
         Default L matrix is of form 1/sigma * I
         """
-        config = {'n': np.prod(data.shape), 'diag': True}
+        config = {'n': np.prod(data.shape), 'diag': True, 'balance': True}
         return config
 
     def make(self, config):
@@ -87,6 +87,7 @@ class Objective():
         iden: (bool) whether or not $L_F$ is identity, overrides diag option below
         diag: (bool) whether or not $L_F$ takes the form $L_F = s*I$
         n: (int) size of $L_F$
+        balance: (bool) whether or not to divide obj fn component by size of L
         """
         assert len(config['L']) == len(config['Y'])
         # create L matrix symbolics
@@ -95,6 +96,8 @@ class Objective():
                 L_base = L['x']
             else:
                 L_base = ca.SX.eye(L['n'])
+            if 'balance' in L and L['balance']:
+                L_base /= ca.sqrt(L_base.shape[0])
             if "iden" in L and L['iden']:
                 self._Ls.append(L_base)
                 continue
@@ -114,5 +117,5 @@ class Objective():
                 self.y0s.append(ca.SX.sym(f'Y0_{i}', *Y['sz']))
             self.ys.append(Y['obs_fn'])
         # assemble objective function
-        self.objective_function = sum(ca.sumsqr(L@(y0-y))/L.shape[0]
+        self.objective_function = sum(ca.sumsqr(L@(y0-y))
                                       for L, y0, y in zip(self._Ls, self.y0s, self.ys))
