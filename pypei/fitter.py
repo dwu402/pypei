@@ -144,7 +144,7 @@ class Solver():
             if bound_range is None:
                 bound_range = profiler._default_bound_range(mle)
             for prfl_p in bound_range:
-                plbg, pubg = profiler.set_g(profiler, prfl_p, lbg_v=lbg, ubg_v=ubg)
+                plbg, pubg = profiler.set_g(prfl_p, lbg_v=lbg, ubg_v=ubg)
                 profile.append(profiler.profiler(x0=mle['x'], p=p, lbx=lbx, ubx=ubx, lbg=plbg, ubg=pubg))
             profiles.append(profile)
         return profiles
@@ -172,9 +172,9 @@ class Profiler():
     def set_g(self, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
         """ Creates the constraint bounds from existing solver bounds """
         # exploiting structure of Casadi.IpoptInterface
-        gsz = self.profiler.size_in(2)
-        lbg = ca.SX.ones(gsz)
-        ubg = ca.SX.ones(gsz)
+        gsz = self.profiler.size_in(4)
+        lbg = np.ones(gsz)
+        ubg = np.ones(gsz)
         lbg[:-1] = lbg_v
         ubg[:-1] = ubg_v
         lbg[-1] = bnd_value
