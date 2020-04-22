@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 # Flags for future
 known_initial_susceptible_size = True
 visualise_mle = True
+visualise_profile = True
 
 
 # creation of synthetic underlying truth
@@ -97,7 +98,7 @@ x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1/10000, 1]).T])
 
 # parameters (L matrices and data)
 solver.prep_p_former(objective)
-p = solver.form_p([1/2., 0.], [data_pd.T.flatten(), 0])
+p = solver.form_p([1/2., 1.], [data_pd.T.flatten(), 0])
 
 # bounds on decision variables
 # non-negative model parameters
@@ -133,6 +134,12 @@ solver.make_profilers(profiler_configs)
 
 # run profilers
 profiles = solver.profile(mle=mle_estimate, p=p, lbx=lbx, ubx=ubx, lbg=0)
+
+if visualise_profile:
+    for profile in profiles:
+        plt.figure()
+        plt.plot(profile['ps'], [pf['f'] for pf in profile['pf']])
+    plt.show()
 
 # predictive uncertainty
 resample_config = dict()

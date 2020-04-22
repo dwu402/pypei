@@ -146,7 +146,7 @@ class Solver():
             for prfl_p in bound_range:
                 plbg, pubg = profiler.set_g(prfl_p, lbg_v=lbg, ubg_v=ubg)
                 profile.append(profiler.profiler(x0=mle['x'], p=p, lbx=lbx, ubx=ubx, lbg=plbg, ubg=pubg))
-            profiles.append(profile)
+            profiles.append({'ps': bound_range, 'pf': profile})
         return profiles
 
     def get_parameters(self, solution, model):
@@ -183,4 +183,4 @@ class Profiler():
 
     def _default_bound_range(self, mle, num=20):
         mle_pval = self.p_locator(mle['x'])
-        return np.linspace(0.5*mle_pval, 1.5*mle_pval, num=num, dtype=float)
+        return np.linspace(0.5*mle_pval, 1.5*mle_pval, num=num, dtype=float).flatten()
