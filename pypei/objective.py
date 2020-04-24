@@ -7,6 +7,7 @@ class Objective():
     def __init__(self, config=None):
         self.ys = []
         self.y0s = []
+        self._y0s = []
         self.Ls = []
         self._Ls = []
 
@@ -109,14 +110,18 @@ class Objective():
                 self._Ls.append(L_base@Lobj)
         # create Y0 (data) symbolics and Y symbolics
         for i, Y in enumerate(config['Y']):
-            if Y['sz'] == 0:
-                self.y0s.append(ca.SX.sym(f'Y0_{i}'))
+            if 'unitary' in Y and Y['unitary']:
+                y0i = ca.SX.sym(f'Y0_{i}')
+                self.y0s.append(y0i)
+                self._y0s.append((y0i * ca.SX.ones(Y['sz'])).T.reshape((-1, 1)))
             else:
-                self.y0s.append(ca.SX.sym(f'Y0_{i}', *Y['sz']))
+                y0i = ca.SX.sym(f'Y0_{i}', *Y['sz'])
+                self.y0s.append(y0i)
+                self._y0s.append(y0i.T.reshape((-1, 1)))
             self.ys.append(Y['obs_fn'])
         # assemble objective function
         self.objective_function = sum(ca.sumsqr(L@(y0-y))
-                                      for L, y0, y in zip(self._Ls, self.y0s, self.ys))
+                                      for L, y0, y in zip(self._Ls, self._y0s, self.ys))
 
     def obj_fn(self, i):
         """ Returns the nth objective function object """

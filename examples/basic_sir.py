@@ -2,15 +2,18 @@ import pypei
 
 import numpy as np
 from scipy.integrate import solve_ivp
+from scipy import stats
 import casadi as ca
 
 from matplotlib import pyplot as plt
 
 # Flags for future
 known_initial_susceptible_size = True
-visualise_mle = True
+visualise_mle = False
+profile = False
 visualise_profile = True
-
+predictive_uq = True
+visualise_predict = True
 
 # creation of synthetic underlying truth
 p_true = [0.6/10000, 0.25]
@@ -37,11 +40,7 @@ data = data_y + np.random.randn(*data_y.shape)*100
 # non-negative
 data[data < 0] = 0
 # strictly increasing
-for i,d in enumerate(data):
-    if i==0:
-        continue
-    if d < data[i-1]:
-        data[i] = data[i-1]
+data = np.maximum.accumulate(data)
 data_pd = data.reshape(-1,1)
 
 # setting up the basis function model
@@ -73,7 +72,8 @@ objective_config = {
             'obs_fn':objective._DATAFIT(model, data_obsv_fn),
         },
         {
-            'sz': 0,
+            'sz': model.xs.shape,
+            'unitary': True,
             'obs_fn': objective._MODELFIT(model),
         },
     ],
@@ -98,7 +98,8 @@ x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1/10000, 1]).T])
 
 # parameters (L matrices and data)
 solver.prep_p_former(objective)
-p = solver.form_p([1/2., 1.], [data_pd.T.flatten(), 0])
+y0s = [data_pd, 0]
+p = solver.form_p([1/2., 1.], y0s)
 
 # bounds on decision variables
 # non-negative model parameters
@@ -129,22 +130,38 @@ if visualise_mle:
     plt.show()
 
 # profile likelihood for parameter uncertainty
-profiler_configs = solver._profiler_configs(model)
-solver.make_profilers(profiler_configs)
+if profile:
+    profiler_configs = solver._profiler_configs(model)
+    solver.make_profilers(profiler_configs)
 
-# run profilers
-profiles = solver.profile(mle=mle_estimate, p=p, lbx=lbx, ubx=ubx, lbg=0)
+    # run profilers
+    profiles = solver.profile(mle=mle_estimate, p=p, lbx=lbx, ubx=ubx, lbg=0)
 
-if visualise_profile:
-    for profile in profiles:
+    if visualise_profile:
+        for profile in profiles:
+            plt.figure()
+            plt.plot(profile['ps'], [pf['f'] for pf in profile['pf']])
+        plt.show()
+
+# predictive uncertainty: simple data resampling
+if predictive_uq:
+    resample_config = dict()
+    resample_sols = []
+    x2y = ca.Function('x2y', [solver.decision_vars], objective.ys) # out: tuple
+    mle_y = x2y(mle_estimate['x'])
+    variances = [((y-x).T@(y-x))/(x.numel()-1) for y, x in zip(y0s, mle_y)]
+    # ^ should use the objective object to iterate through y0s and ys to create this
+    resamples = [[stats.norm(mu, np.sqrt(var)).rvs(random_state=None) for mu, var in zip(mle_y, variances)] for _ in range(50)]
+    for resample, _ in resamples:
+        resample[resample < 0] = 0
+        resample = np.maximum.accumulate(resample)
+        p = solver.form_p([1/2., 1/1.], [resample, 0])
+        resample_sols.append(solver.solver(x0=mle_estimate['x'], p=p, lbx=lbx, ubx=ubx, lbg=0))
+
+    if visualise_predict:
         plt.figure()
-        plt.plot(profile['ps'], [pf['f'] for pf in profile['pf']])
-    plt.show()
-
-# predictive uncertainty
-resample_config = dict()
-resample_sols = []
-resamples = pypei.functions.misc.resample_data(data_pd, resample_config, n=50)
-for resample in resamples:
-    p = solver.form_p([1/2., 1/1.], [resample.T.flatten(), 0])
-    # resample_sols.append(solver.solver(x0=x0, p=p, lbx=lbx, lbg=0))
+        plt.violinplot([observation_function(solver.get_state(s, model))[-1] for s in resample_sols])
+        plt.figure()
+        for s in resample_sols:
+            plt.plot(model.observation_times, observation_function(solver.get_state(s, model)))
+        plt.show()
