@@ -15,7 +15,7 @@ visualise_profile = True
 predictive_uq = True
 visualise_predict = True
 
-# creation of synthetic underlying truth
+# creation of synthetic, underlying ground truth
 p_true = [0.6/10000, 0.25]
 y0_true = [10000, 1]
 tspan = [0, 50]
@@ -145,17 +145,15 @@ if profile:
 
 # predictive uncertainty: simple data resampling
 if predictive_uq:
+    pypei.fitter.reconfig_rto(model, objective, solver, objective_config, index=1)
+
     resample_config = dict()
     resample_sols = []
-    x2y = ca.Function('x2y', [solver.decision_vars], objective.ys) # out: tuple
-    mle_y = x2y(mle_estimate['x'])
-    variances = [((y-x).T@(y-x))/(x.numel()-1) for y, x in zip(y0s, mle_y)]
-    # ^ should use the objective object to iterate through y0s and ys to create this
-    resamples = [[stats.norm(mu, np.sqrt(var)).rvs(random_state=None) for mu, var in zip(mle_y, variances)] for _ in range(50)]
-    for resample, _ in resamples:
+    resamples = pypei.fitter.gaussian_resampling(objective, solver, mle_estimate, y0s, num=50)
+    for resample, gpr in resamples:
         resample[resample < 0] = 0
         resample = np.maximum.accumulate(resample)
-        p = solver.form_p([1/2., 1/1.], [resample, 0])
+        p = solver.form_p([1/2., 1/1.], [resample, gpr])
         resample_sols.append(solver.solver(x0=mle_estimate['x'], p=p, lbx=lbx, ubx=ubx, lbg=0))
 
     if visualise_predict:
@@ -164,4 +162,5 @@ if predictive_uq:
         plt.figure()
         for s in resample_sols:
             plt.plot(model.observation_times, observation_function(solver.get_state(s, model)))
+        plt.plot(sol_true.t, observation_function(sol_true.y.T), 'ko')
         plt.show()

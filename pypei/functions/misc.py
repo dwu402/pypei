@@ -80,10 +80,7 @@ def block_diag(block_size, weights, casadi=False):
     return bd([eye*w for w in weights])
 
 def flat_squash(*args):
+    """ Flattens all elements of a list """
     return [
         arg.reshape((-1, 1)) for arg in args
     ]
-
-def resample_data(data, config, n=1):
-    # TODO
-    return []

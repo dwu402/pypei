@@ -120,6 +120,9 @@ class Objective():
                 self._y0s.append(y0i.T.reshape((-1, 1)))
             self.ys.append(Y['obs_fn'])
         # assemble objective function
+        self.assemble_objective()
+
+    def assemble_objective(self):
         self.objective_function = sum(ca.sumsqr(L@(y0-y))
                                       for L, y0, y in zip(self._Ls, self._y0s, self.ys))
 

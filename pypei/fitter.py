@@ -1,6 +1,7 @@
 """ Interface to CasADi IPOPT interface and related UQ tools """
 import numpy as np
 import casadi as ca
+from scipy import stats
 from .functions import misc
 
 class Solver():
@@ -184,3 +185,45 @@ class Profiler():
     def _default_bound_range(self, mle, num=20):
         mle_pval = self.p_locator(mle['x'])
         return np.linspace(0.5*mle_pval, 1.5*mle_pval, num=num, dtype=float).flatten()
+
+
+"""
+Resampling Tools
+"""
+def reconfig_rto(model, objective, solver, config, index=None):
+    """ Reconfigure unitary data in the objective for full resampling
+
+    Parameters
+    ----------
+    solver: Solver object to rebuild
+    objective: Objective object to rebuild
+    config: Original objective configuration
+    """
+
+    # expand objective
+    if index is None:
+        for i, c in enumerate(config['Y']):
+            if 'unitary' in c and c['unitary']:
+                y0 = ca.SX.sym(f'Y0_{i}', *c['sz'])
+                objective.y0s[i] = y0.reshape((-1, 1))
+                objective._y0s[i] = y0.reshape((-1, 1))
+    else:
+        y0 = ca.SX.sym(f'Y0_{index}', *config['Y'][index]['sz'])
+        objective.y0s[index] = y0.reshape((-1, 1))
+        objective._y0s[index] = y0.reshape((-1, 1))
+    objective.assemble_objective()
+
+    # rebuild solver
+    s_config = solver.make_config(model, objective)
+    solver.make(s_config)
+    solver.prep_p_former(objective) 
+
+
+def gaussian_resampling(objective, solver, mle, data, num=50):
+
+    x2y = ca.Function('x2y', [solver.decision_vars], objective.ys)
+    mle_y = x2y(mle['x'])
+    variances = [((y-x).T@(y-x))/(x.numel()-1) for y, x in zip(data, mle_y)]
+    resamples = [[stats.norm(mu, np.sqrt(var)).rvs(random_state=None) for mu, var in zip(mle_y, variances)] for _ in range(num)]
+
+    return resamples
