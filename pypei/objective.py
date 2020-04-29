@@ -129,3 +129,6 @@ class Objective():
     def obj_fn(self, i):
         """ Returns the nth objective function object """
         return ca.sumsqr(self._Ls[i]@(self.y0s[i]-self.ys[i]))
+
+    def us_obj_fn(self, i):
+        return ca.sumsqr(self.y0s[i]-self.ys[i])

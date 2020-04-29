@@ -218,12 +218,20 @@ def reconfig_rto(model, objective, solver, config, index=None):
     solver.make(s_config)
     solver.prep_p_former(objective) 
 
+def get_mle_y(objective, solver, mle):
+    x2y = ca.Function('x2y', [solver.decision_vars], objective.ys)
+    return x2y(mle['x'])
+
+def var_from_mle_and_data(mle_y, data):
+    return [((y-x).T@(y-x))/(x.numel()-1) for y, x in zip(data, mle_y)]
+
+def estimate_variances(objective, solver, mle, data):
+    mle_y = get_mle_y(objective, solver, mle)
+    return var_from_mle_and_data(mle_y, data)
 
 def gaussian_resampling(objective, solver, mle, data, num=50):
-
-    x2y = ca.Function('x2y', [solver.decision_vars], objective.ys)
-    mle_y = x2y(mle['x'])
-    variances = [((y-x).T@(y-x))/(x.numel()-1) for y, x in zip(data, mle_y)]
+    mle_y = get_mle_y(objective, solver, mle)
+    variances = var_from_mle_and_data(mle_y, data)
     resamples = [[stats.norm(mu, np.sqrt(var)).rvs(random_state=None) for mu, var in zip(mle_y, variances)] for _ in range(num)]
 
     return resamples

@@ -9,11 +9,14 @@ from matplotlib import pyplot as plt
 
 # Flags for future
 known_initial_susceptible_size = True
-visualise_mle = False
+visualise_mle = True
 profile = False
 visualise_profile = True
-predictive_uq = True
+lcurve = False
+visualise_lcurve = True
+predictive_uq = False
 visualise_predict = True
+
 
 # creation of synthetic, underlying ground truth
 p_true = [0.6/10000, 0.25]
@@ -134,13 +137,39 @@ if profile:
     profiler_configs = solver._profiler_configs(model)
     solver.make_profilers(profiler_configs)
 
+    # correctly estimate variances empirically
+    variances = pypei.fitter.estimate_variances(objective, solver, mle_estimate, y0s)
+    p_pr = solver.form_p([1/np.sqrt(float(v)) for v in variances], y0s)
+
     # run profilers
-    profiles = solver.profile(mle=mle_estimate, p=p, lbx=lbx, ubx=ubx, lbg=0)
+    profiles = solver.profile(mle=mle_estimate, p=p_pr, lbx=lbx, ubx=ubx, lbg=0)
 
     if visualise_profile:
         for profile in profiles:
             plt.figure()
             plt.plot(profile['ps'], [pf['f'] for pf in profile['pf']])
+        plt.show()
+
+# generating an L curve
+if lcurve:
+    f1f2 = ca.Function("f1f2", [solver.decision_vars, solver.parameters], [objective.us_obj_fn(0), objective.us_obj_fn(1)])
+    # profile over first L
+    L1 = np.logspace(-2, 2, num=30)
+    L1_profile = []
+    lcrv = []
+    xi = x0
+    for Li in L1:
+        pl = solver.form_p([Li, 1], y0s)
+        L1_profile.append(solver.solver(x0=xi, p=pl, lbx=lbx, ubx=ubx, lbg=0))
+        xi = L1_profile[-1]['x']
+        lcrv.append(f1f2(L1_profile[-1]['x'], pl))
+    if visualise_lcurve:
+        fig, (ax1, ax2) = plt.subplots(2)
+        ax1.loglog([l[0] for l in lcrv], [l[1] for l in lcrv])
+        ax1.set_ylabel("Model misfit")
+        ax2.loglog([l[0] for l in lcrv], L1)
+        ax2.set_ylabel("lambda")
+        ax2.set_xlabel("Data misfit")
         plt.show()
 
 # predictive uncertainty: simple data resampling
