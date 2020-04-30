@@ -1,3 +1,55 @@
+"""
+In this example, we solve the classic generalised profiling problem for inference of a deterministic SIR model
+
+The objective function can be expressed as
+
+H(c, p | s0, s1, y) = 1/(s0)^2 ||y - g(Phi c)||^2 + 1/(s1)^2 || D(Phi c) - f(Phi c, p) ||
+
+for the SIR model
+
+Dx = f(x, p)
+
+and the observation model
+
+y = g(x) + e, e ~ N(0, s0^2)
+
+where 
+D is a differential operator (in this case d/dt)
+f is the vector field of the SIR model (ODE RHS)
+p are the model parameters
+
+y is the observed data
+g is the observation function
+
+c is the projection of the state estimate onto the basis
+Phi is the basis of projection
+
+s0 is the estimated standard deviation of the error in the observation model
+s1 is the estimated standard deviation of the error in the SIR model
+
+-------------------------------------
+
+We generate synthetic data under the observation model, and partially observe it.
+
+This means that not all states are observed
+
+The observation function is
+
+y(t) = S(0) - S(t)
+
+Further, we assume that we do not data to the end of the epidemic.
+
+--------------------------------------
+
+The objective is to
+
+1. Compute an MLE of the state and parameters, given the partially observed data
+2. Quantify the amount of uncertainty in the analysis
+2. Compute uncertainty intervals on the parameter estimates
+3. Compute uncertainty intervals on the state
+
+"""
+
 import pypei
 
 import numpy as np
