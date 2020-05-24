@@ -52,7 +52,7 @@ class Objective():
 
         Default L matrix is of form 1/sigma * I
         """
-        config = {'n': np.prod(data.shape), 'diag': True, 'balance': True}
+        config = {'n': np.prod(data.shape), 'diag': True, 'balance': False}
         return config
 
     def make(self, config):
@@ -70,7 +70,10 @@ class Objective():
         $$
         L_i = L_FL_D(x)
         $$
-        where $L_F$ is a fixed portion and $L_D$ is an x-dependent portion
+        where $L_F$ is a fixed portion and $L_D$ is an x-dependent portion.
+
+        $L_i$ are also modelled as the Cholesky factors of the inverse covariance matrices,
+        so $L_i$ is expected to be triangular.
 
         Configuration Options
         ---------------------
@@ -123,7 +126,8 @@ class Objective():
         self.assemble_objective()
 
     def assemble_objective(self):
-        self.objective_function = sum(ca.sumsqr(L@(y0-y))
+        self.objective_function = sum(ca.sumsqr(L@(y0-y)) 
+                                      - 2*ca.sum1(ca.log(ca.diag(L)))
                                       for L, y0, y in zip(self._Ls, self._y0s, self.ys))
 
     def obj_fn(self, i):

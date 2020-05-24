@@ -62,11 +62,11 @@ from matplotlib import pyplot as plt
 # Flags for future
 known_initial_susceptible_size = True
 visualise_mle = True
-profile = False
+profile = True
 visualise_profile = True
-lcurve = False
+lcurve = True
 visualise_lcurve = True
-predictive_uq = False
+predictive_uq = True
 visualise_predict = True
 
 
@@ -93,9 +93,9 @@ data_t = np.linspace(0, 28, 15)
 data_y = observation_function(sol_true.sol(data_t).T)
 data = data_y + np.random.randn(*data_y.shape)*100
 # non-negative
-data[data < 0] = 0
+# data[data < 0] = 0
 # strictly increasing
-data = np.maximum.accumulate(data)
+# data = np.maximum.accumulate(data)
 data_pd = data.reshape(-1,1)
 
 # setting up the basis function model
@@ -173,7 +173,7 @@ mle_estimate = solver.solver(x0=x0, p=p, lbx=lbx, ubx=ubx, lbg=0)
 if visualise_mle:
     print(solver.get_parameters(mle_estimate, model))
     print(p_true)
-
+    plt.figure()
     plt.plot(model.observation_times, solver.get_state(mle_estimate, model))
     plt.plot(model.observation_times, observation_function(solver.get_state(mle_estimate, model)))
     plt.plot(data_t, data_obsv_fn(solver.get_state(mle_estimate, model)))
@@ -182,7 +182,7 @@ if visualise_mle:
     plt.plot(sol_true.t, sol_true.y.T, 'o')
     plt.plot(sol_true.t, observation_function(sol_true.y.T), 'o')
     plt.ylim([0, 15000])
-    plt.show()
+    # plt.show()
 
 # profile likelihood for parameter uncertainty
 if profile:
@@ -199,41 +199,38 @@ if profile:
     if visualise_profile:
         for profile in profiles:
             plt.figure()
-            plt.plot(profile['ps'], [pf['f'] for pf in profile['pf']])
-        plt.show()
+            fpeak = min([pf['f'] for pf in profile['pf']])
+            plt.plot(profile['ps'], [(pf['f']-fpeak) for pf in profile['pf']])
+        # plt.show()
 
 # generating an L curve
 if lcurve:
     f1f2 = ca.Function("f1f2", [solver.decision_vars, solver.parameters], [objective.us_obj_fn(0), objective.us_obj_fn(1)])
     # profile over first L
-    L1 = np.logspace(-2, 2, num=30)
+    L1 = np.logspace(-4, 3, num=71)
     L1_profile = []
     lcrv = []
-    xi = x0
+    xi = mle_estimate['x']
     for Li in L1:
         pl = solver.form_p([Li, 1], y0s)
         L1_profile.append(solver.solver(x0=xi, p=pl, lbx=lbx, ubx=ubx, lbg=0))
         xi = L1_profile[-1]['x']
         lcrv.append(f1f2(L1_profile[-1]['x'], pl))
     if visualise_lcurve:
-        fig, (ax1, ax2) = plt.subplots(2)
-        ax1.loglog([l[0] for l in lcrv], [l[1] for l in lcrv])
-        ax1.set_ylabel("Model misfit")
-        ax2.loglog([l[0] for l in lcrv], L1)
-        ax2.set_ylabel("lambda")
-        ax2.set_xlabel("Data misfit")
-        plt.show()
+        fpeak = min([s['f'] for s in L1_profile])
+        plt.figure()
+        plt.loglog(L1, [(s['f']-fpeak) for s in L1_profile])
+        # plt.show()
 
 # predictive uncertainty: simple data resampling
 if predictive_uq:
     pypei.fitter.reconfig_rto(model, objective, solver, objective_config, index=1)
 
-    resample_config = dict()
     resample_sols = []
     resamples = pypei.fitter.gaussian_resampling(objective, solver, mle_estimate, y0s, num=50)
     for resample, gpr in resamples:
-        resample[resample < 0] = 0
-        resample = np.maximum.accumulate(resample)
+        # resample[resample < 0] = 0
+        # resample = np.maximum.accumulate(resample)
         p = solver.form_p([1/2., 1/1.], [resample, gpr])
         resample_sols.append(solver.solver(x0=mle_estimate['x'], p=p, lbx=lbx, ubx=ubx, lbg=0))
 
@@ -244,4 +241,6 @@ if predictive_uq:
         for s in resample_sols:
             plt.plot(model.observation_times, observation_function(solver.get_state(s, model)))
         plt.plot(sol_true.t, observation_function(sol_true.y.T), 'ko')
-        plt.show()
+        # plt.show()
+
+plt.show()

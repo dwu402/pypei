@@ -232,6 +232,7 @@ def estimate_variances(objective, solver, mle, data):
 def gaussian_resampling(objective, solver, mle, data, num=50):
     mle_y = get_mle_y(objective, solver, mle)
     variances = var_from_mle_and_data(mle_y, data)
-    resamples = [[stats.norm(mu, np.sqrt(var)).rvs(random_state=None) for mu, var in zip(mle_y, variances)] for _ in range(num)]
+    resamples = [[stats.norm(mu, np.sqrt(var)).rvs(random_state=None) 
+                  for mu, var in zip(mle_y, variances)] for _ in range(num)]
 
     return resamples
