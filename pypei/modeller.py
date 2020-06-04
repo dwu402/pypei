@@ -27,7 +27,26 @@ class Model():
             self.generate_model(configuration)
 
     def generate_model(self, configuration):
-        """ Logic to construct a model, and smooth representation on BSpline basis """
+        """ Logic to construct a model, and smooth representation on BSpline basis 
+        
+        Configuration Options
+        ---------------------
+        grid_size : int : number of collocation points
+        basis_number : int : number of basis functions
+        model : callable : undelying model
+        model_form : dict : 
+            state : int : number of states in the underlying model
+            parameters : int : number of parameters in the underlying model
+        time_span : tuple <float> : start and end time of fitting window
+        knot_function : callable (optional) : knot location generator based on the data. Defaults to uniformly spaced knots
+        dataset : array (optional) : dataset to pass to knot_function
+        dphi : callable (optional) : User-input function to generate matrix representing the differential operator. Defaults to using exact derivative from casadi.
+
+        Notes
+        -----
+        model : has signature model(t, y, p) -> dydt. Inputs are (t) time/independent variable (y) state (p) model parameters
+        dphi: has signature dphi(t) -> D_t. Input is a list of collocation times in the fitting window
+        """
         self.n = configuration['grid_size']
         self.K = configuration['basis_number']
         self.s = configuration['model_form']['state']
@@ -51,11 +70,14 @@ class Model():
         phi = ca.Function('phi', [self.ts], [self.basis])
         self.phi = np.array(phi(self.observation_times))
 
-        bjac = ca.vcat(
-            [ca.diag(ca.jacobian(self.basis[:, i], self.ts))
-             for i in range(self.K)]
-            ).reshape((self.n, self.K))
-        self.basis_jacobian = np.array(ca.Function('bjac', [self.ts], [bjac])(self.observation_times))
+        if 'dphi' in configuration and configuration['dphi']:
+            self.basis_jacobian = configuration['dphi'](self.observation_times) @ self.phi
+        else:
+            bjac = ca.vcat(
+                [ca.diag(ca.jacobian(self.basis[:, i], self.ts))
+                for i in range(self.K)]
+                ).reshape((self.n, self.K))
+            self.basis_jacobian = np.array(ca.Function('bjac', [self.ts], [bjac])(self.observation_times))
 
         # create the objects that define the smooth, model parameters
         self.cs = [ca.SX.sym("c_"+str(i), self.K, 1) for i in range(self.s)]
@@ -70,7 +92,7 @@ class Model():
                                  [ca.hcat(configuration['model'](self.tssx, self._xs, self.ps))])
 
     def get_x(self, *cs):
-        """ Exposes calculation of trajectory """
+        """ Exposes calculation of state from given spline coefficients"""
         if self.getx is None:
             self.getx = ca.Function("getx",
                                     [*self.cs],
