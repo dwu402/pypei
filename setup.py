@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pypei",
-    version="0.1.0a1",
+    version="0.1.0a2",
     author="David Wu",
     author_email="dwu402@aucklanduni.ac.nz",
     description="Implementation of generalised profiling in CasADi",
