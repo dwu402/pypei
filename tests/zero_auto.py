@@ -41,7 +41,7 @@ objective_config = {
     'Y': [
         {
             'sz': y.shape,
-            'obs_fn':objective._DATAFIT(model, lambda x: 0.*x),
+            'obs_fn':objective._DATAFIT(model, lambda x, p: 0.*x),
         },
     ],
     'L': [

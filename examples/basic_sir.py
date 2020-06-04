@@ -117,7 +117,7 @@ model = pypei.modeller.Model(model_config)
 objective = pypei.objective.Objective()
 
 # observation model, now with added interpolation
-def data_obsv_fn(y):
+def data_obsv_fn(y, p):
     return y[0,0] - ca.interp1d(model.observation_times, y[:,0], data_t)
 
 objective_config = {

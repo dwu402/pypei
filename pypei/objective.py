@@ -17,12 +17,13 @@ class Objective():
             self.make(config)
 
     @staticmethod
-    def _DATAFIT(model, obsv_fn=lambda x: x):
+    def _DATAFIT(model, obsv_fn=lambda x, p: x):
         """ Default data fit objective value
 
-        Assuming form ||y_0 - g(x)||^2, returns g(x)
+        Assuming form ||y_0 - g(x, p)||^2, returns g(x, p)
+        for model state x and model parameters p
         """
-        return obsv_fn(model.xs).reshape((-1, 1))
+        return obsv_fn(model.xs, model.ps).reshape((-1, 1))
 
     @staticmethod
     def _MODELFIT(model):
