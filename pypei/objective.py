@@ -31,7 +31,7 @@ class Objective():
 
         Assuming form ||Dx- f(x,p)||^2, returns Dx-f(x,p)
         """
-        return (model.xdash - model.model(model.observation_times, 
+        return (model.xdash - model.model(model.observation_times,
                                           *model.cs, *model.ps)
                ).reshape((-1, 1))
 
@@ -48,13 +48,47 @@ class Objective():
         return config
 
     @staticmethod
-    def _autoconfig_L(data):
+    def _autoconfig_L(data, auto=False, sigma=None):
         """ Generates default configuration for L matrix
 
         Default L matrix is of form 1/sigma * I
+
+        Options
+        -------
+        auto (bool): whether ot not configure the variance to be estimated
+        Assumes form L = 1/sigma * I (where sigma is to be estimated)
+        sigma (casadi SX): symbolic representing the variance to be estimated
         """
-        config = {'n': np.prod(data.shape), 'diag': True, 'balance': False}
+        if auto:
+            config = Objective._autoconfig_autoL(data, sigma)
+        else: # default path
+            config = Objective._autoconfig_constL(data)
         return config
+
+    @staticmethod
+    def _autoconfig_autoL(data, sigma):
+        """ L configuration for automated optimisation of variance of form
+
+        L = 1/sigma * I
+        """
+        return {
+                'depx': True,
+                'x': 1 / sigma * ca.SX.eye(np.prod(data.shape)),
+                'iden': True,
+                'balance': False,
+               }
+
+    @staticmethod
+    def _autoconfig_constL(data):
+        """ L configuration for optimisation under given L, where
+
+        L = 1/sigma * I
+        """
+        return {
+                'n': np.prod(data.shape),
+                'diag': True,
+                'balance': False
+               }
 
     def make(self, config):
         """ Make the objective function given the configuration options
@@ -127,13 +161,15 @@ class Objective():
         self.assemble_objective()
 
     def assemble_objective(self):
-        self.objective_function = sum(ca.sumsqr(L@(y0-y)) 
+        """ (Re)builds the objective function from L, data and model components """
+        self.objective_function = sum(ca.sumsqr(L@(y0-y))
                                       - 2*ca.sum1(ca.log(ca.diag(L)))
                                       for L, y0, y in zip(self._Ls, self._y0s, self.ys))
 
     def obj_fn(self, i):
         """ Returns the nth objective function object """
-        return ca.sumsqr(self._Ls[i]@(self.y0s[i]-self.ys[i]))
+        return ca.sumsqr(self._Ls[i]@(self._y0s[i]-self.ys[i]))
 
     def us_obj_fn(self, i):
-        return ca.sumsqr(self.y0s[i]-self.ys[i])
+        """ Returns the nth objective function object, without covariance scaling """
+        return ca.sumsqr(self._y0s[i]-self.ys[i])
