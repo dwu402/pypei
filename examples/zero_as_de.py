@@ -12,15 +12,23 @@ import pypei
 import numpy as np
 import casadi as ca
 from matplotlib import pyplot as plt
+try:
+    from findiff import FinDiff
+except ImportError:
+    print("Please install the findiff Python library")
+    raise ImportError("Cannot find findiff")
 
+time_span = [0, 100]
 N = 100
-dt = 100/N
+dt = (time_span[1] - time_span[0])/N
 
 # generate sigma = 0.3
 y = np.random.randn(N) * 1.5
 
 def zero_model(t, y, p):
     return [0.*y[0]]
+
+
 
 model_form = {
     'state': 1,
@@ -30,8 +38,10 @@ model_config = {
     'grid_size': N,
     'basis_number': 20,
     'model_form': model_form,
-    'time_span': [0, 100],
+    'time_span': time_span,
     'model': zero_model,
+    # first order finite difference
+    'dphi': lambda x: FinDiff(0, dt, 1, acc=1).matrix((N,)).toarray()
 }
 
 model = pypei.modeller.Model(model_config)
