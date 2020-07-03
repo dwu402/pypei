@@ -70,7 +70,7 @@ class Model():
         phi = ca.Function('phi', [self.ts], [self.basis])
         self.phi = np.array(phi(self.observation_times))
 
-        if 'dphi' in configuration and configuration['dphi']:
+        if 'dphi' in configuration and configuration['dphi'] is not None:
             self.basis_jacobian = configuration['dphi'](self.observation_times) @ self.phi
         else:
             bjac = ca.vcat(
