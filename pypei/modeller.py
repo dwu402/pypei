@@ -98,3 +98,7 @@ class Model():
                                     [*self.cs],
                                     self.xs)
         return self.getx(*cs)
+
+    def x_at(self, cs, ts):
+        t_phi = np.vstack([b(ts).toarray().flatten() for b in self.basis_fns]).T
+        return t_phi@cs

@@ -118,8 +118,9 @@ p = solver.form_p([], y0s)
 # bounds on decision variables
 # non-negative model parameters
 # positive std deviations
-lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0], [1e-10], [1e-3]]])
+lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0], [1e-10], [1e-10]]])
 ubx = np.ones(x0.shape)*np.inf
+ubx[-2:,0] = [1e-3, 1e-3]
 
 # specify ics
 lbx[0] = y0_true[0]
