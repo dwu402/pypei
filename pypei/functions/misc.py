@@ -1,3 +1,4 @@
+from inspect import signature
 from scipy.linalg import block_diag as bd
 import numpy as np
 import casadi as ca
@@ -84,3 +85,15 @@ def flat_squash(*args):
     return [
         arg.reshape((-1, 1)) for arg in args
     ]
+
+def _filter_arguments(function, arguments, remove=[]):
+    """ Filters kwargs for a given function 
+    from https://stackoverflow.com/questions/55590419/filter-keyword-arguments-when-calling-function
+    """
+    return {k:a for k,a in arguments.items() 
+            if k in signature(function).parameters and k not in remove}
+
+def func_kw_filter(func): 
+    def filtered_func(*args, **kwargs): 
+        return func(*args, **_filter_arguments(func, kwargs)) 
+    return filtered_func 
