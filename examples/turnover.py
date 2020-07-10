@@ -46,7 +46,7 @@ data_obsv_fn = model.x_at(ca.hcat(model.cs), data_t)
 
 # standard deviation detection
 stdev_obsv = ca.SX.sym('so')
-stdev_model = ca.SX.sym('sm')
+# stdev_model = ca.SX.sym('sm')
 
 objective_config = {
     'Y': [
@@ -67,12 +67,7 @@ objective_config = {
             'iden': True, 
             'balance': False,
         },
-        {
-            'depx': True,
-            'x': np.sqrt(t_span[-1]/model_config['grid_size']) / stdev_model * ca.SX.eye(np.prod(model.xs.shape)),
-            'iden': True, 
-            'balance': False,
-        }
+        objective._autoconfig_L(model.xs)
     ]
 }
 
@@ -82,25 +77,25 @@ objective.make(objective_config)
 solver = pypei.fitter.Solver()
 # using default solver setup
 solver_config = solver.make_config(model, objective)
-solver_config['x'] = ca.vcat([solver_config['x'], stdev_obsv, stdev_model])
+solver_config['x'] = ca.vcat([solver_config['x'], stdev_obsv])
 solver.make(solver_config)
 
 # initial interate
 proto_x0 = solver.proto_x0(model)
 # for all ones
 # x0 = proto_x0['x0'] 
-L0 = np.array([0.1, 0.1]).reshape((-1, 1))
+L0 = np.array([0.1]).reshape((-1, 1))
 x0 = np.concatenate([proto_x0['c0'], (proto_x0['p0'].T*[1, 1]).T, L0])
 
 # parameters (L matrices and data)
 solver.prep_p_former(objective)
 y0s = [data_pd, 0]
-p = solver.form_p([], y0s)
+p = solver.form_p([10], y0s)
 
 # bounds on decision variables
 # non-negative model parameters
 # positive std deviations
-lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0], [1e-12], [1e-3]]])
+lbx = np.concatenate([proto_x0['c0']*-np.inf, [[0], [0], [1e-12]]])
 ubx = np.ones(x0.shape)*np.inf
 # For some reason, an upper bound needs to be applied. Even so, there are NaN errors, restoration errors, and search direction errors.
 # ubx[-2:, 0] = [1e2, 1e2]
@@ -110,9 +105,10 @@ mle_estimate = solver.solver(x0=x0, p=p, lbx=lbx, ubx=ubx, lbg=0)
 
 print(solver.get_parameters(mle_estimate, model))
 print(p_true)
-print(mle_estimate['x'][-2:])
+print(mle_estimate['x'][-1:])
 plt.figure()
-plt.plot(model.observation_times, solver.get_state(mle_estimate, model))
-plt.plot(data_t, data_pd, 'v')
-plt.plot(sol_true.t, sol_true.y.T, 'o')
+plt.plot(model.observation_times, solver.get_state(mle_estimate, model), label='estimate')
+plt.plot(data_t, data_pd, 'v', label='data')
+plt.plot(sol_true.t, sol_true.y.T, 'o', label='truth')
+plt.legend()
 plt.show()
