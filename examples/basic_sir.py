@@ -62,11 +62,11 @@ from matplotlib import pyplot as plt
 # Flags for future
 known_initial_susceptible_size = True
 visualise_mle = True
-profile = True
+profile = False
 visualise_profile = True
 lcurve = True
 visualise_lcurve = True
-predictive_uq = True
+predictive_uq = False
 visualise_predict = True
 
 
@@ -176,7 +176,7 @@ if visualise_mle:
     plt.figure()
     plt.plot(model.observation_times, solver.get_state(mle_estimate, model))
     plt.plot(model.observation_times, observation_function(solver.get_state(mle_estimate, model)))
-    plt.plot(data_t, data_obsv_fn(solver.get_state(mle_estimate, model)))
+    plt.plot(data_t, data_obsv_fn(solver.get_state(mle_estimate, model), solver.get_parameters(mle_estimate, model)))
     plt.plot(data_t, data_pd, 'v')
     plt.plot(data_t, data_y, 'x')
     plt.plot(sol_true.t, sol_true.y.T, 'o')
