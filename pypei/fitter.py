@@ -27,6 +27,8 @@ class Solver():
 
         self.profilers = []
 
+        self.__evaluator__ = None
+
         if config:
             self.make(config)
 
@@ -62,6 +64,13 @@ class Solver():
 
     def __call__(self, *args, **kwargs):
         return self.solver(*args, **kwargs)
+
+    def eval_at(self, x, p):
+        if not self.__evaluator__:
+            self.__evaluator__ = ca.Function('evaluator', 
+                                           [self.decision_vars, self.parameters], 
+                                           [self.objective_function])
+        return self.__evaluator__(x, p)
 
     @staticmethod
     def make_config(model, objective):
