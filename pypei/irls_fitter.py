@@ -13,7 +13,7 @@ for i in 1..N; do
 """
 
 import casadi as ca
-from numpy import sqrt
+from numpy import array, sqrt
 from . import fitter
 from .functions.misc import func_kw_filter
 
@@ -25,8 +25,17 @@ def _gaussian_weight_function(residuals, n_obsv):
     # TODO: determine if n_obsv is available automatically
     return 1/sqrt([float(r)/n_obsv for r in residuals])
 
+@func_kw_filter
+def _gaussian_inverse_weight_function(weights):
+    """ Mapping from weights to variance """
+    return 1/array(weights)**2
+
 _known_weight_functions = {
     "gaussian": _gaussian_weight_function
+}
+
+_inverse_weight_functions = {
+    'gaussian': _gaussian_inverse_weight_function
 }
 
 class Solver(fitter.Solver):

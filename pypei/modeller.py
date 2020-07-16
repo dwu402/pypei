@@ -102,3 +102,7 @@ class Model():
     def x_at(self, cs, ts):
         t_phi = np.vstack([b(ts).toarray().flatten() for b in self.basis_fns]).T
         return t_phi@cs
+
+    def all_x_at(self, cs, ts):
+        t_phi = np.vstack([b(ts).toarray().flatten() for b in self.basis_fns]).T
+        return ca.hcat([t_phi@c for c in cs])

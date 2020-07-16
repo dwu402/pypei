@@ -151,11 +151,11 @@ class Objective():
             if 'unitary' in Y and Y['unitary']:
                 y0i = ca.SX.sym(f'Y0_{i}')
                 self.y0s.append(y0i)
-                self._y0s.append((y0i * ca.SX.ones(Y['sz'])).T.reshape((-1, 1)))
+                self._y0s.append((y0i * ca.SX.ones(Y['sz'])).reshape((-1, 1)))
             else:
                 y0i = ca.SX.sym(f'Y0_{i}', *Y['sz'])
                 self.y0s.append(y0i)
-                self._y0s.append(y0i.T.reshape((-1, 1)))
+                self._y0s.append(y0i.reshape((-1, 1)))
             self.ys.append(Y['obs_fn'])
         # assemble objective function
         self.assemble_objective()
@@ -163,7 +163,7 @@ class Objective():
     def assemble_objective(self):
         """ (Re)builds the objective function from L, data and model components """
         self.objective_function = sum(ca.sumsqr(L@(y0-y))
-                                      - 2*ca.sum1(ca.log(ca.diag(L)))
+                                      #- 2*ca.sum1(ca.log(ca.diag(L)))
                                       for L, y0, y in zip(self._Ls, self._y0s, self.ys))
 
     def obj_fn(self, i):
