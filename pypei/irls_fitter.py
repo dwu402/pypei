@@ -13,7 +13,7 @@ for i in 1..N; do
 """
 
 import casadi as ca
-from numpy import array, sqrt
+from numpy import array, sqrt, inf
 from . import fitter
 from .functions.misc import func_kw_filter
 
@@ -23,7 +23,7 @@ def _gaussian_weight_function(residuals, n_obsv):
     We know that the weights are 1/sigma and that sigma^2 = f/n
     """
     # TODO: determine if n_obsv is available automatically
-    return 1/sqrt([float(r)/n_obsv for r in residuals])
+    return 1/sqrt([float(ca.sumsqr(r))/n_obsv for r in residuals])
 
 @func_kw_filter
 def _gaussian_inverse_weight_function(weights):
@@ -52,6 +52,7 @@ class Solver(fitter.Solver):
         super().__init__(*args, **kwargs)
         # need to assign later if not given here, used for irls algorithm weights
         self.objective_obj = objective
+        self.residual_function = None
 
     def __call__(self, *args, **kwargs):
         self.irls(*args, **kwargs)
@@ -75,8 +76,14 @@ class Solver(fitter.Solver):
             return self._solver(*args, **{k:v for k,v in kwargs.items() 
                                           if k in self._solver.name_in()})
         self.solver = solver
+        # from knowing the general form of the objective function, we can deduce
+        # that the weights will be tied to the unweighted components (residuals)
+        self.residual_function = ca.Function("mu",
+                                             [self.decision_vars, self.parameters],
+                                             [self.objective_obj.us_obj_comp(i)
+                                              for i in range(len(self.objective_obj.ys))])
 
-    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, **kwargs):
+    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, solver=None, weight_args=None, **solver_args):
         """ Performs iteratively reweighted least squares
 
         Parameters
@@ -98,8 +105,12 @@ class Solver(fitter.Solver):
         hist : bool
             Whether or not to record the history of decision variable solutions
             and weights
-        **kwargs : 
-            Additional keyword arguments passed to the solver and weighting functions
+        solver : Casadi.nlpsol object or None
+            Object to solve with. If None, defaults to self.solver
+        weight_args : dict
+            Additional information passed to the weight function as arguments
+        solver_args : 
+            Additional keyword arguments passed to the solver
         """
 
         assert nit >= 1, f"Number of iterations specified <{nit}> is less than 1."
@@ -108,7 +119,7 @@ class Solver(fitter.Solver):
                 f"Weight function type <{weight}> not understood."
             weight_fn = _known_weight_functions[weight]
         else:
-            weight_fn = func_kw_filter(weight)
+            weight_fn = weight
         
         if w0 is None:
             weights = [1] * len(self.objective_obj.Ls)
@@ -119,19 +130,18 @@ class Solver(fitter.Solver):
             mu_hist = []
             w_hist = [weights]
 
-        # from knowing the general form of the objective function, we can deduce
-        # that the weights will be tied to the unweighted components (residuals)
-        residual_fn = ca.Function("mu",
-                                  [self.decision_vars, self.parameters],
-                                  [self.objective_obj.us_obj_fn(i)
-                                   for i in range(len(self.objective_obj.ys))])
+        if solver is None:
+            solver = self.solver
+
+        if weight_args is None:
+            weight_args = {}
 
         for _ in range(nit):
             p_of_ws = p(weights)
-            sol = self.solver(x0=x0, p=p_of_ws, **kwargs)
+            sol = solver(x0=x0, p=p_of_ws, **solver_args)
             x0 = sol['x'].toarray().flatten()
-            residuals = residual_fn(sol['x'], p_of_ws)
-            weights = weight_fn(residuals=residuals, **kwargs)
+            residuals = self.residual_function(sol['x'], p_of_ws)
+            weights = weight_fn(residuals=residuals, **weight_args)
             if hist:
                 mu_hist.append(sol)
                 w_hist.append(weights)
@@ -141,6 +151,30 @@ class Solver(fitter.Solver):
 
         return sol, weights
 
-    def profile(self, *args, **kwargs):
+    def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
         # TODO: Construct an equivalent profiling setup
-        return super().profile(*args, **kwargs)
+        profiles = []
+        if not pbounds:
+            pbounds = [profiler._default_bound_range(mle) for profiler in self.profilers]
+        for profiler, bound_range in zip(self.profilers, pbounds):
+            profile = {'s': [], 'w': []}
+            if bound_range is None:
+                bound_range = profiler._default_bound_range(mle)
+            for profile_p in bound_range:
+                plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
+                # TODO fix signature fumbling of func_kw_filter
+                s, w = self.irls(mle['x'], p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=False, solver=profiler, weight_args=weight_args, **kwargs)
+                profile['s'].append(s)
+                profile['w'].append(w)
+            profiles.append({'ps': bound_range, 'pf': profile})
+        return profiles
+
+    def gaussian_resample(self, mle, objective, nsamples, data, reconfigure=False, **kwargs):
+        if reconfigure:
+            assert 'model' in kwargs
+            assert 'config' in kwargs
+            index = kwargs['index'] if 'index' in kwargs else None
+            fitter.reconfig_rto(kwargs['model'], objective, self, kwargs['config'], index=index)
+        
+        resample_sols = []
+

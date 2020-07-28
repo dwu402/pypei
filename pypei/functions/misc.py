@@ -1,4 +1,5 @@
 from inspect import signature
+from functools import wraps
 from scipy.linalg import block_diag as bd
 import numpy as np
 import casadi as ca
@@ -93,7 +94,8 @@ def _filter_arguments(function, arguments, remove=[]):
     return {k:a for k,a in arguments.items() 
             if k in signature(function).parameters and k not in remove}
 
-def func_kw_filter(func): 
+def func_kw_filter(func):
+    @wraps(func)
     def filtered_func(*args, **kwargs): 
         return func(*args, **_filter_arguments(func, kwargs)) 
     return filtered_func 

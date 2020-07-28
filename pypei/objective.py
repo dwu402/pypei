@@ -173,3 +173,7 @@ class Objective():
     def us_obj_fn(self, i):
         """ Returns the nth objective function object, without covariance scaling """
         return ca.sumsqr(self._y0s[i]-self.ys[i])
+
+    def us_obj_comp(self, i):
+        """ Returns the components of the nth objective function object """
+        return self._y0s[i] - self.ys[i]

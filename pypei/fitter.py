@@ -179,6 +179,9 @@ class Profiler():
                                   },
                                   solver.solve_opts)
 
+    def __call__(self, *args, **kwargs):
+        return self.profiler(*args, **kwargs)
+
     def set_g(self, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
         """ Creates the constraint bounds from existing solver bounds """
         # exploiting structure of Casadi.IpoptInterface

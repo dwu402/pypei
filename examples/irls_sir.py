@@ -67,10 +67,9 @@ objective_config = {
 }
 objective.make(objective_config)
 
-solver = pypei.irls_fitter.Solver()
+solver = pypei.irls_fitter.Solver(objective=objective)
 solver_config = solver.make_config(model, objective)
 solver.make(solver_config)
-solver.objective_obj = objective
 
 # lbx = np.ones(solver_config['x'].shape) * -np.inf
 
@@ -81,11 +80,17 @@ x0x0[:-2] = x0x0[:-2] * 1000
 def p(w):
     return [*w, *[i for l in y_noisy for i in l], 0]
 
-sol, ws, shist, whist = solver.irls(x0x0, p, nit=10, n_obsv=n_obsv, hist=True)
+weight_args = {'n_obsv': n_obsv}
+
+sol, ws, shist, whist = solver.irls(x0x0, p, nit=10, weight_args=weight_args, hist=True)
 
 print("variances: ", pypei.irls_fitter._inverse_weight_functions['gaussian'](ws))
 print("pars: ", solver.get_parameters(sol, model))
 
-plt.plot(model.observation_times, solver.get_state(sol, model))
-plt.plot(ts, y_noisy.T, 'o')
-plt.show()
+# plt.plot(model.observation_times, solver.get_state(sol, model))
+# plt.plot(ts, y_noisy.T, 'o')
+# plt.show()
+
+prof_config = solver._profiler_configs(model)
+solver.make_profilers(prof_config)
+solver.profile(sol, p=p, w0=ws, nit=4, weight_args=weight_args)
