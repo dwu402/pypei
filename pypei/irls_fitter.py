@@ -13,9 +13,12 @@ for i in 1..N; do
 """
 
 import casadi as ca
-from numpy import array, sqrt, inf
+from numpy import array, sqrt, inf, zeros
+from numpy.random import default_rng
 from . import fitter
 from .functions.misc import func_kw_filter
+
+random = default_rng()
 
 @func_kw_filter
 def _gaussian_weight_function(residuals, n_obsv):
@@ -169,12 +172,30 @@ class Solver(fitter.Solver):
             profiles.append({'ps': bound_range, 'pf': profile})
         return profiles
 
-    def gaussian_resample(self, mle, objective, nsamples, data, reconfigure=False, **kwargs):
+    def gaussian_resample(self, mle, ws, objective, nsamples, reconfigure=False, **kwargs):
         if reconfigure:
             assert 'model' in kwargs
             assert 'config' in kwargs
             index = kwargs['index'] if 'index' in kwargs else None
             fitter.reconfig_rto(kwargs['model'], objective, self, kwargs['config'], index=index)
-        
-        resample_sols = []
 
+        # construct the y0s to refit
+        # modelling y0 ~ y + N(0, G)
+        resampled_y0s = []
+        for y, L in zip(objective.ys, objective._Ls):
+            # compute G = (L.T)^-1((L.T)^-1).T
+            # extract L via p and objective.Ls
+            G = ca.Function('w2G', [*objective.Ls, self.decision_vars], [ca.inv(L.T)@(ca.inv(L.T).T)])(*ws, mle['x'])
+            mean = zeros(L.size(1))
+            samples = random.multivariate_normal(mean, G, size=nsamples)
+            y_base = ca.Function('yfromdv', [self.decision_vars], [y])(mle['x'])
+            resampled_y0s.append(samples + y_base.toarray().flatten())
+
+        resample_sols = []
+        for sample in zip(*resampled_y0s):
+            # construct the p function to pass to irls
+            def w2p(w):
+                return [*w, *[zi for z in sample for zi in z]]
+            resample_sols.append(self.irls(mle['x'], p=w2p, hist=False, **kwargs))
+
+        return resample_sols
