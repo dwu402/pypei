@@ -14,8 +14,8 @@ import pypei
 # FLAGS
 ###################
 show_truth = False
-show_mle = True
-do_profile = False
+show_mle = False
+do_profile = True
 show_profile = True
 do_state_uq = True
 show_state_uq = True
@@ -111,6 +111,8 @@ if do_profile:
     profiles = solver.profile(sol, p=p, w0=ws, nit=4, weight_args=weight_args)
 
     if show_profile:
+        # ob1kenob = ca.Function('ob1kenob', [solver.decision_vars, solver.parameters], [objective.obj_fn(0)])
+        full_ll = ca.Function('lLfn', [solver.decision_vars, solver.parameters], [objective.log_likelihood])
         for i, profile in enumerate(profiles):
             plt.figure()
             plt.plot(profile['ps'], [x['f'] for x in profile['pf']['s']])
@@ -131,6 +133,10 @@ if do_profile:
                 plt.plot(model.observation_times, I, '--', color=cl, alpha=0.7)
                 plt.plot(model.observation_times, R, '-.', color=cl, alpha=0.7)
             plt.title(f'State plots {i}')
+
+            plt.figure()
+            plt.plot(profile['ps'], [full_ll(s['x'], p(ws)) for s in profile['pf']['s']])
+            plt.title(f"Full log likelihood")
 
 if do_state_uq:
     pypei.fitter.reconfig_rto(model, objective, solver, objective_config, index=1)
