@@ -12,7 +12,9 @@ for i in 1..N; do
 
 """
 
+import warnings
 import casadi as ca
+from functools import wraps
 from numpy import array, sqrt, inf, zeros
 from numpy.random import default_rng
 from . import fitter
@@ -75,6 +77,7 @@ class Solver(fitter.Solver):
         super().make(config)
         # keyword filter the solver
         self._solver = self.solver
+        @wraps(self._solver)
         def solver(*args, **kwargs):
             return self._solver(*args, **{k:v for k,v in kwargs.items() 
                                           if k in self._solver.name_in()})
@@ -165,7 +168,6 @@ class Solver(fitter.Solver):
                 bound_range = profiler._default_bound_range(mle)
             for profile_p in bound_range:
                 plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
-                # TODO fix signature fumbling of func_kw_filter
                 s, w = self.irls(mle['x'], p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=False, solver=profiler, weight_args=weight_args, **kwargs)
                 profile['s'].append(s)
                 profile['w'].append(w)
@@ -174,8 +176,9 @@ class Solver(fitter.Solver):
 
     def gaussian_resample(self, mle, ws, objective, nsamples, reconfigure=False, **kwargs):
         if reconfigure:
-            assert 'model' in kwargs
-            assert 'config' in kwargs
+            warnings.warn("RTO reconfiguration is best done outside of the resampling function", RuntimeWarning)
+            assert 'model' in kwargs, "Model not provided"
+            assert 'config' in kwargs, "Objective Configuration not provided"
             index = kwargs['index'] if 'index' in kwargs else None
             fitter.reconfig_rto(kwargs['model'], objective, self, kwargs['config'], index=index)
 
