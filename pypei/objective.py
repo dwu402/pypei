@@ -144,7 +144,7 @@ class Objective():
                 self._Ls.append(L_base@Lobj)
             else:
                 Lobj = ca.SX.sym(f'L_{i}', L['n'], L['n'])
-                self.Ls.append(L_base@Lobj)
+                self.Ls.append(Lobj)
                 self._Ls.append(L_base@Lobj)
         # create Y0 (data) symbolics and Y symbolics
         for i, Y in enumerate(config['Y']):

@@ -4,6 +4,13 @@ import casadi as ca
 from scipy import stats
 from .functions import misc
 
+ipopt_silent = {
+    'ipopt': {
+        'print_level': 0,
+    },
+    'print_time': 0
+}
+
 class Solver():
     """ Solver interface to CasADi non linear solver """
     def __init__(self, config=None):
