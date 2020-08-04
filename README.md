@@ -22,7 +22,7 @@ or
 conda install --channel conda-forge --file requirements.txt
 ```
 
-For conda on Windows, you will need to use pip to install conda:
+For conda on Windows, you will need to use pip to install casadi:
 
 ```powershell
 conda install --file requirements_win_conda.txt
