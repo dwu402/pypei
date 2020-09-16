@@ -6,4 +6,5 @@ build/*
 .ipynb_checkpoints/*
 .vscode/*
 
+.notes
 .output/*
