@@ -265,3 +265,43 @@ def L_via_data(config, data):
         config['numL'] += 1
 
     config['iid'] = False
+
+def map_order_to_L_struct(order, n_sz, inherent_order=None):
+    """
+    Maps a given structured order of quantities with length n_sz to
+    an appropriate struct field of an L config.
+
+    If inherent order is not given, assumes order contains numerical
+    indices (0, 1, ...)
+
+    Example
+    -------
+    map_order_to_L_struct(['AB', 'CF', 'E', 'D'], 50, 'ABCDEF')
+    >> [
+        {'ns': [50, 50], 'i0s': [0, 50]},
+        {'ns': [50, 50], 'i0s': [100, 250]},
+        {'n': 50, 'i0': 200},
+        {'n': 50, 'i0': 150}, 
+    ]
+    """
+
+    if inherent_order == None:
+        find = lambda i: i
+    else:
+        find = lambda i: inherent_order.index(i)
+
+    struct = list()
+    for x in order:
+        elem = dict()
+        if hasattr(x, "__len__") and len(x) > 1:
+            elem['ns'] = []
+            elem['i0s'] = []
+            for i in x:
+                elem['ns'].append(n_sz)
+                elem['i0s'].append(n_sz*find(i))
+        else:
+            elem['n'] = n_sz
+            elem['i0'] = n_sz*find(x)
+        struct.append(elem)
+    return struct
+
