@@ -14,8 +14,8 @@ import pypei
 # FLAGS
 ###################
 show_truth = False
-show_mle = False
-do_profile = True
+show_mle = True
+do_profile = False
 show_profile = True
 do_state_uq = True
 show_state_uq = True
@@ -39,7 +39,7 @@ sol_true = solve_ivp(sir_model, t_span=t_span, y0=y0_true, args=[p_true], dense_
 n_obsv = 13
 ts = np.linspace(t_span[0], t_span[1]*0.5, n_obsv)
 ys = sol_true.sol(ts)[[0,2],:]
-y_noisy = ys + 20*np.random.randn(*ys.shape)
+y_noisy = ys + 10*np.random.randn(*ys.shape)
 
 if show_truth:
     plt.figure()
@@ -83,7 +83,7 @@ objective.make(objective_config)
 
 solver = pypei.irls_fitter.Solver(objective=objective)
 solver_config = solver.make_config(model, objective)
-# solver_config['o'] = pypei.fitter.ipopt_silent
+solver_config['o'] = pypei.fitter.ipopt_silent
 solver.make(solver_config)
 
 x0 = solver.proto_x0(model)
@@ -140,11 +140,13 @@ if do_profile:
 
 if do_state_uq:
     pypei.fitter.reconfig_rto(model, objective, solver, objective_config, index=1)
-    rss = solver.gaussian_resample(sol, ws, objective, 50,
+    rss, rys = solver.gaussian_resample(sol, [y_noisy.flatten(), 0], ws, objective, 1000,
                                weight_args=weight_args, nit=4)
 
     if show_state_uq:
         plt.figure()
+        for y, _ in zip(*rys):
+            plt.plot(ts, y.reshape(y_noisy.shape).T, 'k+', alpha=0.1)
         for s, _ in rss:
             plt.plot(model.observation_times, solver.get_state(s, model), 'k', alpha=0.05)
         truth_ts = np.linspace(*t_span, 2001)
@@ -155,5 +157,7 @@ if do_state_uq:
         rss_ps = [solver.get_parameters(x, model) for x,_ in rss]
         plt.figure()
         plt.plot(*list(zip(*rss_ps)), 'o')
+        plt.plot(*p_true, 'P')
+        plt.plot(*solver.get_parameters(sol, model), 'X')
 
 plt.show()

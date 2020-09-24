@@ -174,7 +174,7 @@ class Solver(fitter.Solver):
             profiles.append({'ps': bound_range, 'pf': profile})
         return profiles
 
-    def gaussian_resample(self, mle, ws, objective, nsamples, reconfigure=False, **kwargs):
+    def gaussian_resample(self, mle, data, ws, objective, nsamples, reconfigure=False, **kwargs):
         if reconfigure:
             warnings.warn("RTO reconfiguration is best done outside of the resampling function", RuntimeWarning)
             assert 'model' in kwargs, "Model not provided"
@@ -185,20 +185,20 @@ class Solver(fitter.Solver):
         # construct the y0s to refit
         # modelling y0 ~ y + N(0, G)
         resampled_y0s = []
-        for y, L in zip(objective.ys, objective._Ls):
+        for y, L in zip(data, objective._Ls):
             # compute G = (L.T)^-1((L.T)^-1).T
             # extract L via p and objective.Ls
             G = ca.Function('w2G', [*objective.Ls, self.decision_vars], [ca.inv(L.T)@(ca.inv(L.T).T)])(*ws, mle['x'])
             mean = zeros(L.size(1))
             samples = random.multivariate_normal(mean, G, size=nsamples)
-            y_base = ca.Function('yfromdv', [self.decision_vars], [y])(mle['x'])
-            resampled_y0s.append(samples + y_base.toarray().flatten())
+            # y_base = ca.Function('yfromdv', [self.decision_vars], [y])(mle['x'])
+            resampled_y0s.append(samples + y)
 
         resample_sols = []
         for sample in zip(*resampled_y0s):
             # construct the p function to pass to irls
             def w2p(w):
-                return [*w, *[zi for z in sample for zi in z]]
+                return [*w, *[i for j in sample for i in j]]
             resample_sols.append(self.irls(mle['x'], p=w2p, hist=False, **kwargs))
 
-        return resample_sols
+        return resample_sols, resampled_y0s
