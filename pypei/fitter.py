@@ -4,7 +4,17 @@ import casadi as ca
 from scipy import stats
 from .functions import misc
 
+ipopt_reduced = {
+    'ipopt': {
+        # standard verbosity
+        'print_level': 5,
+        # print every 50 iterations
+        'print_frequency_iter': 50,
+    }
+}
+
 ipopt_silent = {
+    # No output except initial banner
     'ipopt': {
         'print_level': 0,
     },
@@ -22,14 +32,8 @@ class Solver():
 
         self._p_former = None
 
-        self.__default_solve_opts__ = {
-            'ipopt': {
-                # standard verbosity
-                'print_level': 5,
-                # print every 50 iterations
-                'print_frequency_iter': 50,
-            }
-        }
+        self.__default_solve_opts__ = ipopt_reduced
+
         self.solve_opts = self.__default_solve_opts__
 
         self.profilers = []

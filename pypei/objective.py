@@ -2,6 +2,18 @@
 import numpy as np
 import casadi as ca
 
+def replace_nan(data_obj):
+    """ Replaces nans with zeros, additionally returns locations of nans 
+    
+    Returns
+    -------
+    [0]: data_obj with nans as zeros
+    [1]: list of indices that nans were at [(i,j), (i,j), ...]
+    """
+
+    nan_inds = list(zip(*np.indices(data_obj.shape)[:, np.isnan(data_obj)]))
+    return np.nan_to_num(data_obj), nan_inds
+
 class Objective():
     """ Contains the objective function """
     def __init__(self, config=None):
@@ -87,7 +99,7 @@ class Objective():
         """
         return {
                 'n': np.prod(data.shape),
-                'diag': True,
+                'iid': True,
                 'balance': False
                }
 
@@ -123,9 +135,26 @@ class Objective():
         depx: (bool) whether or not L has an x-dependent portion
         x: the form on $L_D(x)$. Required if depx is True
         iden: (bool) whether or not $L_F$ is identity, overrides diag option below
-        diag: (bool) whether or not $L_F$ takes the form $L_F = s*I$
+        iid: (bool) whether or not $L_F$ takes the form $L_F = s*I$
+        numL: (int) number of free parameters in $L_F$
+        struct: (iterable) locations of the free parameters
         n: (int) size of $L_F$
         balance: (bool) whether or not to divide obj fn component by size of L
+
+        Further Options
+        ---------------
+
+        struct (L) : <list of> index by i
+        1. <list>
+            represents a list of indices to insert the i-th symbol
+            <tuple>
+                Used as an index into an n by n matrix to place the i-th symbol.
+            <int>
+                Location on the diagonal of an n by n matrix to place i-th symbol
+        2. <dict> 
+            represents a diagonal structure to place copies of the i-th symbol
+            i0 : upper left corner index
+            n : number of rows
         """
         assert len(config['L']) == len(config['Y'])
         # create L matrix symbolics
@@ -139,11 +168,32 @@ class Objective():
             if "iden" in L and L['iden']:
                 self._Ls.append(L_base)
                 continue
-            if 'diag' in L and L['diag']:
+            if 'iid' in L and L['iid']:
                 Lobj = ca.SX.sym(f'L_{i}')
                 self.Ls.append(Lobj)
                 self._Ls.append(L_base@Lobj)
+            elif 'numL' in L and 'struct' in L and L['numL'] and L['struct']:
+                Lobj = ca.SX.sym(f'L_{i}', L['numL'])
+                self.Ls.append(Lobj)
+                _L = ca.SX(L['n'], L['n']) # structural zero matrix
+                for Li, info in zip(Lobj.nz, L['struct']):
+                    if 'n' in info: # dict-int style
+                        i0, n = (info['i0'], info['n'])
+                        _L[i0:i0+n, i0:i0+n] = Li * ca.SX.eye(n)
+                    elif 'ns' in info: # dict-list style
+                        i0s, ns = (info['i0s'], info['ns'])
+                        for i0, n in zip(i0s, ns):
+                            _L[i0:i0+n, i0:i0+n] = Li * ca.SX.eye(n)
+                    else: # index list style
+                        for i in info:
+                            if isinstance(i, int):
+                                _L[i,i] = Li
+                            else:
+                                i, j = i
+                                _L[i, j] = Li
+                self._Ls.append(L_base@_L)
             else:
+                # default is a completely free L matrix
                 Lobj = ca.SX.sym(f'L_{i}', L['n'], L['n'])
                 self.Ls.append(Lobj)
                 self._Ls.append(L_base@Lobj)
@@ -180,3 +230,38 @@ class Objective():
     def us_obj_comp(self, i):
         """ Returns the components of the nth objective function object """
         return self._y0s[i] - self.ys[i]
+
+def ignore_nan(data, casobj=None):
+    """ Removes nans and flattens data and corresponding CasADi object
+
+    Returns
+    -------
+    indexer: array of bool
+        Truthy table of where data is finite (non nan or inf)
+    <tuple>
+        Flattened and nan-stripped data (and casobj if provided)
+    """
+    indexer = np.isfinite(data)
+
+    if casobj is None:
+        return indexer, (data[indexer],)
+    else:
+        assert data.shape == casobj.shape, f"{data.shape} not the same as {casobj.shape}"
+        # CasADi objects do not support logical indexing
+        # CasADi objects flatten column-first (with .nz), cf np.array which flatten row-first
+        igcasobj = ca.vcat([oi for oi,z in zip(casobj.T.nz, indexer.flatten()) if z])
+        return indexer, (data[indexer], igcasobj)
+
+def L_via_data(config, data):
+    indexer, _ = ignore_nan(data)
+
+    accum = 0
+    config['numL'] = 0
+    config['struct'] = []
+    for data_col in indexer:
+        n = sum(data_col)
+        config['struct'].append({'n': n, 'i0': accum})
+        accum += n
+        config['numL'] += 1
+
+    config['iid'] = False
