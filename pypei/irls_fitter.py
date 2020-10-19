@@ -28,7 +28,7 @@ def _gaussian_weight_function(residuals, n_obsv):
     We know that the weights are 1/sigma and that sigma^2 = f/n
     """
     # TODO: determine if n_obsv is available automatically
-    return 1/sqrt([float(ca.sumsqr(r))/n_obsv for r in residuals])
+    return 1/sqrt([float(ca.sumsqr(r))/n for r,n in zip(residuals, n_obsv)])
 
 @func_kw_filter
 def _gaussian_inverse_weight_function(weights):
@@ -89,7 +89,7 @@ class Solver(fitter.Solver):
                                              [self.objective_obj.us_obj_comp(i)
                                               for i in range(len(self.objective_obj.ys))])
 
-    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, solver=None, weight_args=None, **solver_args):
+    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, solver=None, weight_args=None, MODEL=None, **solver_args):
         """ Performs iteratively reweighted least squares
 
         Parameters

@@ -17,7 +17,7 @@ show_truth = False
 show_mle = True
 do_profile = False
 show_profile = True
-do_state_uq = True
+do_state_uq = False
 show_state_uq = True
 ###################
 
@@ -39,7 +39,7 @@ sol_true = solve_ivp(sir_model, t_span=t_span, y0=y0_true, args=[p_true], dense_
 n_obsv = 13
 ts = np.linspace(t_span[0], t_span[1]*0.5, n_obsv)
 ys = sol_true.sol(ts)[[0,2],:]
-y_noisy = ys + 10*np.random.randn(*ys.shape)
+y_noisy = ys + 25*np.random.randn(*ys.shape)
 
 if show_truth:
     plt.figure()
@@ -72,7 +72,7 @@ objective_config = {
             'sz': model.xs.shape,
             'unitary': True,
             'obs_fn': objective._MODELFIT(model),
-        }
+        },
     ],
     'L': [
         objective._autoconfig_L(y_noisy,),# auto=True, sigma=ss[0]),
@@ -83,7 +83,7 @@ objective.make(objective_config)
 
 solver = pypei.irls_fitter.Solver(objective=objective)
 solver_config = solver.make_config(model, objective)
-solver_config['o'] = pypei.fitter.ipopt_silent
+# solver_config['o'] = pypei.fitter.ipopt_silent
 solver.make(solver_config)
 
 x0 = solver.proto_x0(model)
@@ -93,9 +93,9 @@ x0x0[:-2] = x0x0[:-2] * 1000
 def p(w):
     return [*w, *[i for l in y_noisy for i in l], 0]
 
-weight_args = {'n_obsv': n_obsv}
+weight_args = {'n_obsv': [n_obsv, model_config['grid_size']]}
 
-sol, ws, shist, whist = solver.irls(x0x0, p, nit=4, weight_args=weight_args, hist=True)
+sol, ws, shist, whist = solver.irls(x0x0, p, nit=4, weight_args=weight_args, hist=True, MODEL=model)
 
 print("variances: ", pypei.irls_fitter._inverse_weight_functions['gaussian'](ws))
 print("pars: ", solver.get_parameters(sol, model))
