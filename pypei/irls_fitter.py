@@ -199,12 +199,15 @@ class Solver(fitter.Solver):
         
         for i in range(controls['maxiter']):
             residual = float(residual_function(x0))
-            if (residual - old_residual)/(controls['gamma'] + abs(residual)) > controls['eps']:
+            err = (residual - old_residual)/(controls['gamma'] + abs(residual))
+            # print(residual, old_residual, err)
+            if err < -controls['eps']:
                 break
             x0 = (x0 + old_x) / 2
         else:
+            # print(residual, old_residual)
             raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations")
-        print("step control adjusted", i, "times")
+        print("Step control adjusted", i+1, "times")
         return x0, residual
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
