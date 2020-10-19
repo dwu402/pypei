@@ -163,10 +163,15 @@ class Solver(fitter.Solver):
             p_of_ws = p(weights)
             sol = solver(x0=x0, p=p_of_ws, **solver_args)
             if i > 1:
-                x0 = self._irls_step_control(
-                        sol['x'].toarray().flatten(),
-                        lambda x: self.residual(x, p_of_ws),
-                        x0, step_control)
+                try:
+                    x0 = self._irls_step_control(
+                            sol['x'].toarray().flatten(),
+                            lambda x: self.residual(x, p_of_ws),
+                            x0, step_control
+                        )
+                except Solver.StepControlError:
+                    print("Early termination due to divergence of objective function")
+                    break
             else:
                 x0 = sol['x'].toarray().flatten()
             residuals = self.component_residuals(sol['x'], p_of_ws)
@@ -195,7 +200,7 @@ class Solver(fitter.Solver):
                 break
             x0 = (x0 + old_x) / 2
         else:
-            raise Solver.StepControlError("Step control did not converge after ", controls['maxiter'], "iterations")
+            raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations")
         print("step control adjusted", i, "times")
         return x0
 
