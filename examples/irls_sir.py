@@ -2,8 +2,8 @@
 SIR fitting via IRLS
 """
 
-import casadi as ca
 import numpy as np
+import casadi as ca
 from matplotlib import pyplot as plt
 from matplotlib import cm as mplcm
 from matplotlib import colors as colors
@@ -15,6 +15,7 @@ import pypei
 ###################
 show_truth = False
 show_mle = True
+mle_analyse = True
 do_profile = False
 show_profile = True
 do_state_uq = False
@@ -102,8 +103,26 @@ print("pars: ", solver.get_parameters(sol, model))
 
 if show_mle:
     plt.figure()
-    plt.plot(model.observation_times, solver.get_state(sol, model))
-    plt.plot(ts, y_noisy.T, 'o')
+    plt.plot(model.observation_times, solver.get_state(sol, model), label='MLE')
+    plt.plot(ts, y_noisy.T, 'o', label='data')
+    plt.plot(sol_true.t, sol_true.y.T, '--', label='truth')
+    plt.legend()
+
+if mle_analyse:
+    # plot of history of sol['f']
+    plt.figure()
+    plt.semilogy([s['f'] for s in shist])
+    plt.title('Deviance history')
+
+    # plot of history of weights
+    plt.figure()
+    plt.plot(whist)
+    plt.title('Weight history')
+
+    # plot of parameter history
+    plt.figure()
+    plt.plot([solver.get_parameters(s, model) for s in shist])
+    plt.title('Parameter history')
 
 if do_profile:
     prof_config = solver._profiler_configs(model)

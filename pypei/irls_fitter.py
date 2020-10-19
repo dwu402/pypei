@@ -85,10 +85,13 @@ class Solver(fitter.Solver):
         self.solver = solver
         # from knowing the general form of the objective function, we can deduce
         # that the weights will be tied to the unweighted components (residuals)
-        self.residual_function = ca.Function("mu",
-                                             [self.decision_vars, self.parameters],
-                                             [self.objective_obj.us_obj_comp(i)
-                                              for i in range(len(self.objective_obj.ys))])
+        self.residual = ca.Function("residual",
+                                    [self.decision_vars, self.parameters],
+                                    [self.objective_obj.objective_function])
+        self.component_residuals = ca.Function("mu",
+                                               [self.decision_vars, self.parameters],
+                                               [self.objective_obj.us_obj_comp(i)
+                                                for i in range(len(self.objective_obj.ys))])
 
     def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, step_control=None, solver=None, weight_args=None, **solver_args):
         """ Performs iteratively reweighted least squares
@@ -162,11 +165,11 @@ class Solver(fitter.Solver):
             if i > 1:
                 x0 = self._irls_step_control(
                         sol['x'].toarray().flatten(),
-                        lambda x: self.residual_function(x, p_of_ws),
-                        x0, npnorm(residuals), step_control)
+                        lambda x: self.residual(x, p_of_ws),
+                        x0, step_control)
             else:
                 x0 = sol['x'].toarray().flatten()
-            residuals = self.residual_function(sol['x'], p_of_ws)
+            residuals = self.component_residuals(sol['x'], p_of_ws)
             weights = weight_fn(residuals=residuals, **weight_args)
             if hist:
                 mu_hist.append(sol)
@@ -178,17 +181,17 @@ class Solver(fitter.Solver):
         return sol, weights
 
     @staticmethod
-    def _irls_step_control(x0, residual_function, old_x, old_residuals, controls):
+    def _irls_step_control(x0, residual_function, old_x, controls):
         """ Step control for IRLS inspired by glm2.fit from R/CRAN
         """
-        residual = npnorm(residual_function(x0))
+        old_residual = float(residual_function(old_x))
         
-        for _ in range(controls['maxiter']):
-            if (residual - old_residuals)/(controls['gamma'] + abs(residual)) > controls['eps']:
+        for i in range(controls['maxiter']):
+            residual = float(residual_function(x0))
+            if (residual - old_residual)/(controls['gamma'] + abs(residual)) > controls['eps']:
                 break
             x0 = (x0 + old_x) / 2
-            residual = npnorm(residual_function(x0))
-
+        print("step control adjusted", i, "times")
         return x0
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
