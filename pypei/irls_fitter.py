@@ -180,6 +180,9 @@ class Solver(fitter.Solver):
 
         return sol, weights
 
+    class StepControlError(RuntimeError):
+        pass
+
     @staticmethod
     def _irls_step_control(x0, residual_function, old_x, controls):
         """ Step control for IRLS inspired by glm2.fit from R/CRAN
@@ -191,6 +194,8 @@ class Solver(fitter.Solver):
             if (residual - old_residual)/(controls['gamma'] + abs(residual)) > controls['eps']:
                 break
             x0 = (x0 + old_x) / 2
+        else:
+            raise Solver.StepControlError("Step control did not converge after ", controls['maxiter'], "iterations")
         print("step control adjusted", i, "times")
         return x0
 
