@@ -15,7 +15,8 @@ for i in 1..N; do
 import warnings
 import casadi as ca
 from functools import wraps
-from numpy import array, sqrt, inf, zeros
+from numpy import array, sqrt, inf, zeros, abs
+from numpy.linalg import norm as npnorm
 from numpy.random import default_rng
 from . import fitter
 from .functions.misc import func_kw_filter
@@ -89,7 +90,7 @@ class Solver(fitter.Solver):
                                              [self.objective_obj.us_obj_comp(i)
                                               for i in range(len(self.objective_obj.ys))])
 
-    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, solver=None, weight_args=None, MODEL=None, **solver_args):
+    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, step_control=None, solver=None, weight_args=None, **solver_args):
         """ Performs iteratively reweighted least squares
 
         Parameters
@@ -111,6 +112,11 @@ class Solver(fitter.Solver):
         hist : bool
             Whether or not to record the history of decision variable solutions
             and weights
+        step_control : dict
+            Dictionary of parameters to control step-correction
+                maxiter: maximum number of correction steps to take in one iteration
+                eps : threshold value for acceptable relative reduction in deviance
+                gamma : weighting value for uniform test (relativve reduction)
         solver : Casadi.nlpsol object or None
             Object to solve with. If None, defaults to self.solver
         weight_args : dict
@@ -136,16 +142,30 @@ class Solver(fitter.Solver):
             mu_hist = []
             w_hist = [weights]
 
+        if step_control is None:
+            # defaults taken from glm2.fit
+            step_control = {
+                'maxiter': 25,
+                'eps': 1e-8,
+                'gamma': 0.1
+            }
+
         if solver is None:
             solver = self.solver
 
         if weight_args is None:
             weight_args = {}
 
-        for _ in range(nit):
+        for i in range(nit):
             p_of_ws = p(weights)
             sol = solver(x0=x0, p=p_of_ws, **solver_args)
-            x0 = sol['x'].toarray().flatten()
+            if i > 1:
+                x0 = self._irls_step_control(
+                        sol['x'].toarray().flatten(),
+                        lambda x: self.residual_function(x, p_of_ws),
+                        x0, npnorm(residuals), step_control)
+            else:
+                x0 = sol['x'].toarray().flatten()
             residuals = self.residual_function(sol['x'], p_of_ws)
             weights = weight_fn(residuals=residuals, **weight_args)
             if hist:
@@ -156,6 +176,20 @@ class Solver(fitter.Solver):
             return sol, weights, mu_hist, w_hist
 
         return sol, weights
+
+    @staticmethod
+    def _irls_step_control(x0, residual_function, old_x, old_residuals, controls):
+        """ Step control for IRLS inspired by glm2.fit from R/CRAN
+        """
+        residual = npnorm(residual_function(x0))
+        
+        for _ in range(controls['maxiter']):
+            if (residual - old_residuals)/(controls['gamma'] + abs(residual)) > controls['eps']:
+                break
+            x0 = (x0 + old_x) / 2
+            residual = npnorm(residual_function(x0))
+
+        return x0
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
         # TODO: Construct an equivalent profiling setup

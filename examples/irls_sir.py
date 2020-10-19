@@ -140,7 +140,7 @@ if do_profile:
 
 if do_state_uq:
     pypei.fitter.reconfig_rto(model, objective, solver, objective_config, index=1)
-    rss, rys = solver.gaussian_resample(sol, [y_noisy.flatten(), 0], ws, objective, 1000,
+    rss, rys = solver.gaussian_resample(sol, [y_noisy.flatten(), 0], ws, objective, 20,
                                weight_args=weight_args, nit=4)
 
     if show_state_uq:
