@@ -142,7 +142,8 @@ class Solver(fitter.Solver):
             weights = w0
 
         if hist:
-            mu_hist = []
+            raw_sol_hist = []
+            sol_hist = []
             w_hist = [weights]
 
         if step_control is None:
@@ -164,7 +165,7 @@ class Solver(fitter.Solver):
             sol = solver(x0=x0, p=p_of_ws, **solver_args)
             if i > 1:
                 try:
-                    x0 = self._irls_step_control(
+                    x0, residual = self._irls_step_control(
                             sol['x'].toarray().flatten(),
                             lambda x: self.residual(x, p_of_ws),
                             x0, step_control
@@ -174,14 +175,16 @@ class Solver(fitter.Solver):
                     break
             else:
                 x0 = sol['x'].toarray().flatten()
-            residuals = self.component_residuals(sol['x'], p_of_ws)
+                residual = self.residual(x0, p_of_ws)
+            residuals = self.component_residuals(x0, p_of_ws)
             weights = weight_fn(residuals=residuals, **weight_args)
             if hist:
-                mu_hist.append(sol)
+                raw_sol_hist.append(sol)
+                sol_hist.append({'x': x0, 'f': residual})
                 w_hist.append(weights)
 
         if hist:
-            return sol, weights, mu_hist, w_hist
+            return sol, weights, sol_hist, w_hist, raw_sol_hist
 
         return sol, weights
 
@@ -202,7 +205,7 @@ class Solver(fitter.Solver):
         else:
             raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations")
         print("step control adjusted", i, "times")
-        return x0
+        return x0, residual
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
         # TODO: Construct an equivalent profiling setup
