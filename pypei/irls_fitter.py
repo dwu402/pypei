@@ -16,7 +16,7 @@ import warnings
 import casadi as ca
 from functools import wraps
 from numpy import array, sqrt, inf, zeros, abs
-from numpy.linalg import norm as npnorm
+from numpy.linalg import norm as npnorm, solve as linsolve
 from numpy.random import default_rng
 from . import fitter
 from .functions.misc import func_kw_filter
@@ -87,13 +87,17 @@ class Solver(fitter.Solver):
         # that the weights will be tied to the unweighted components (residuals)
         self.residual = ca.Function("residual",
                                     [self.decision_vars, self.parameters],
-                                    [self.objective_obj.objective_function])
+                                    [self.objective_obj.log_likelihood])
         self.component_residuals = ca.Function("mu",
                                                [self.decision_vars, self.parameters],
                                                [self.objective_obj.us_obj_comp(i)
                                                 for i in range(len(self.objective_obj.ys))])
 
-    def irls(self, x0, p, w0=None, nit=4, weight="gaussian", hist=False, step_control=None, solver=None, weight_args=None, **solver_args):
+    @staticmethod
+    def _default_p(ws, data):
+        return ca.vcat([ws, data])
+
+    def irls(self, x0, p=None, y=None, w0=None, nit=4, weight="gaussian", hist=False, step_control=None, solver=None, weight_args=None, **solver_args):
         """ Performs iteratively reweighted least squares
 
         Parameters
@@ -101,7 +105,9 @@ class Solver(fitter.Solver):
         x0 : 
             Initial iterate for the decision variables.
         p : callable
-            Function that, given the weights, returns the solver parameters
+            Function that, given the weights (and data), returns the solver parameters
+        y :
+            Value to pass through to p (represents data)
         w0 :
             Initial iterate for the weights. Defaults to a ones-like
         nit : int
@@ -129,6 +135,10 @@ class Solver(fitter.Solver):
         """
 
         assert nit >= 1, f"Number of iterations specified <{nit}> is less than 1."
+        
+        if p is None:
+            p = self._default_p
+        
         if isinstance(weight, str):
             assert weight in _known_weight_functions, \
                 f"Weight function type <{weight}> not understood."
@@ -137,7 +147,7 @@ class Solver(fitter.Solver):
             weight_fn = weight
         
         if w0 is None:
-            weights = [1] * len(self.objective_obj.Ls)
+            weights = [1] * ca.vcat(self.objective_obj.Ls).numel()
         else:
             weights = w0
 
@@ -145,11 +155,12 @@ class Solver(fitter.Solver):
             raw_sol_hist = []
             sol_hist = []
             w_hist = [weights]
+            ctrl_hist = []
 
         if step_control is None:
             # defaults taken from glm2.fit
             step_control = {
-                'maxiter': 25,
+                'maxiter': 5,
                 'eps': 1e-8,
                 'gamma': 0.1
             }
@@ -161,30 +172,34 @@ class Solver(fitter.Solver):
             weight_args = {}
 
         for i in range(nit):
-            p_of_ws = p(weights)
+            p_of_ws = p(weights, y)
             sol = solver(x0=x0, p=p_of_ws, **solver_args)
-            if i > 1:
+            if i > 0:
                 try:
-                    x0, residual = self._irls_step_control(
-                            sol['x'].toarray().flatten(),
-                            lambda x: self.residual(x, p_of_ws),
-                            x0, step_control
-                        )
+                    x0, residual, controls = self._irls_step_control(
+                        sol['x'].toarray().flatten(),
+                        lambda x: self.residual(x, p_of_ws),
+                        x0, residual, step_control,
+                    )
+                    if controls[1] >= 1:
+                        print("Step control adjusted", controls[1]+1, "times at iteration", i)
                 except Solver.StepControlError:
-                    print("Early termination due to divergence of objective function")
+                    print("Early termination at iteration", i+1, "due to divergence of objective function")
                     break
             else:
                 x0 = sol['x'].toarray().flatten()
-                residual = self.residual(x0, p_of_ws)
-            residuals = self.component_residuals(x0, p_of_ws)
-            weights = weight_fn(residuals=residuals, **weight_args)
+                residual = float(self.residual(x0, p_of_ws))
+                controls = (None, None)
+            component_residuals = self.component_residuals(x0, p_of_ws)
+            weights = weight_fn(residuals=component_residuals, **weight_args)
             if hist:
                 raw_sol_hist.append(sol)
                 sol_hist.append({'x': x0, 'f': residual})
                 w_hist.append(weights)
+                ctrl_hist.append(controls)
 
         if hist:
-            return sol, weights, sol_hist, w_hist, raw_sol_hist
+            return sol, weights, sol_hist, w_hist, raw_sol_hist, ctrl_hist
 
         return sol, weights
 
@@ -192,23 +207,20 @@ class Solver(fitter.Solver):
         pass
 
     @staticmethod
-    def _irls_step_control(x0, residual_function, old_x, controls):
+    def _irls_step_control(x0, residual_function, old_x, old_residual, controls):
         """ Step control for IRLS inspired by glm2.fit from R/CRAN
         """
-        old_residual = float(residual_function(old_x))
-        
+
         for i in range(controls['maxiter']):
             residual = float(residual_function(x0))
-            err = (residual - old_residual)/(controls['gamma'] + abs(residual))
+            err = (residual - old_residual)#/(controls['gamma'] + abs(residual))
             # print(residual, old_residual, err)
             if err < -controls['eps']:
                 break
             x0 = (x0 + old_x) / 2
         else:
-            # print(residual, old_residual)
             raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations")
-        print("Step control adjusted", i+1, "times")
-        return x0, residual
+        return x0, residual, (err, i)
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
         # TODO: Construct an equivalent profiling setup
@@ -227,7 +239,19 @@ class Solver(fitter.Solver):
             profiles.append({'ps': bound_range, 'pf': profile})
         return profiles
 
-    def gaussian_resample(self, mle, data, ws, objective, nsamples, reconfigure=False, **kwargs):
+    def gaussian_resample(self, mle, p, data, ws, objective, nsamples, reconfigure=False, **kwargs):
+        """
+        Inputs
+        ------
+        mle: Dictionary from nlpsol that contains the decision variable vector in 'x'
+        p: Function that, given the weights, returns the solver parameters
+        data: data that is fed to the sampler
+        ws: weights that correspond with the MLE
+        objective: pypei.Objective object
+        nsamples: number of samples to draw
+        reconfigure: recc. False, True if need to reconfigure the objective problem for RTO
+        **kwargs: arguments passed to solver
+        """
         if reconfigure:
             warnings.warn("RTO reconfiguration is best done outside of the resampling function", RuntimeWarning)
             assert 'model' in kwargs, "Model not provided"
@@ -238,20 +262,16 @@ class Solver(fitter.Solver):
         # construct the y0s to refit
         # modelling y0 ~ y + N(0, G)
         resampled_y0s = []
-        for y, L in zip(data, objective._Ls):
-            # compute G = (L.T)^-1((L.T)^-1).T
-            # extract L via p and objective.Ls
-            G = ca.Function('w2G', [*objective.Ls, self.decision_vars], [ca.inv(L.T)@(ca.inv(L.T).T)])(*ws, mle['x'])
-            mean = zeros(L.size(1))
-            samples = random.multivariate_normal(mean, G, size=nsamples)
-            # y_base = ca.Function('yfromdv', [self.decision_vars], [y])(mle['x'])
-            resampled_y0s.append(samples + y)
+        for i, (y, L) in enumerate(zip(data, objective._Ls)):
+            # sample gaussian with a given cholesky decomp of a precision matrix
+            L_real = ca.Function(f'Lreal{i}', [ca.vcat(objective.Ls), self.decision_vars], [L])(ws, mle['x'])
+            Z = random.standard_normal((L.size(1), nsamples))
+            X = linsolve(L_real, Z)
+
+            resampled_y0s.append(X.T + y)
 
         resample_sols = []
         for sample in zip(*resampled_y0s):
-            # construct the p function to pass to irls
-            def w2p(w):
-                return [*w, *[i for j in sample for i in j]]
-            resample_sols.append(self.irls(mle['x'], p=w2p, hist=False, **kwargs))
+            resample_sols.append(self.irls(mle['x'], p=p, y=sample, w0=ws, hist=False, **kwargs))
 
         return resample_sols, resampled_y0s

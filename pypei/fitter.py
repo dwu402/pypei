@@ -10,6 +10,8 @@ ipopt_reduced = {
         'print_level': 5,
         # print every 50 iterations
         'print_frequency_iter': 50,
+        # for correct multipliers on fixed decision variables?
+        # 'fixed_variable_treatment': 'make_constraint',
     }
 }
 
@@ -62,6 +64,9 @@ class Solver():
         if 'o' in config:
             self.solve_opts = config['o']
 
+        self.construct()
+
+    def construct(self):
         self.solver = ca.nlpsol(
             'solver', 'ipopt',
             {
@@ -127,7 +132,7 @@ class Solver():
         """
         return [{'g+': p, 'pidx': ca.Function('pidx', [self.decision_vars], [p])} for p in model.ps]
 
-    def make_profilers(self, configs):
+    def add_profilers(self, configs):
         """ Creates profilers from configs
 
         Inherit problem structure from solver.
@@ -139,6 +144,21 @@ class Solver():
         """
         for config in configs:
             self.profilers.append(Profiler(self, config))
+
+
+    def make_profilers(self, configs):
+        """ Creates profilers from configs.
+        Clears existing profilers
+
+        Inherit problem structure from solver.
+
+        Config options
+        --------------
+        g+: (required) symbolic that represents the parameter/expression being profiled
+        pidx: function that determines the profiled expression's value in the MLE. Used by default bounds
+        """
+        self.profilers = []
+        self.add_profilers(configs)
 
     def profile(self, mle, p=None, lbx=-np.inf, ubx=np.inf, lbg=-np.inf, ubg=np.inf, pbounds=None):
         """ Executes the profilers
@@ -180,7 +200,7 @@ class Profiler():
     """ Tightly bound sub-object of Solver """
     def __init__(self, solver, config):
         profile_constraint = ca.vcat([solver.constraints, config['g+']])
-        self.p_locator = config['pidx']
+        self.p_locator = config.get('pidx', None)
         self.profiler = ca.nlpsol('solver', 'ipopt',
                                   {
                                       'x': solver.decision_vars,
