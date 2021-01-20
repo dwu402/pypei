@@ -225,9 +225,15 @@ class Profiler():
         ubg[-1] = bnd_value
         return lbg, ubg
 
-    def _default_bound_range(self, mle, num=20):
+    def _default_bound_range(self, mle, num=21):
         mle_pval = self.p_locator(mle['x'])
         return np.linspace(0.5*mle_pval, 1.5*mle_pval, num=num, dtype=float).flatten()
+
+    def symmetric_bound_sets(self, mle, num=21):
+        mle_pval = self.p_locator(mle['x'])
+        n = num//2 + 1
+        return [np.linspace(mle_pval, 0.5*mle_pval, num=n, dtype=float).flatten(), 
+                np.linspace(mle_pval, 1.5*mle_pval, num=n, dtype=float).flatten(),]
 
 
 """

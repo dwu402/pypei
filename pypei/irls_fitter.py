@@ -222,21 +222,24 @@ class Solver(fitter.Solver):
             raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations")
         return x0, residual, (err, i)
 
-    def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, **kwargs):
-        # TODO: Construct an equivalent profiling setup
+    def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, **kwargs):
         profiles = []
         if not pbounds:
-            pbounds = [profiler._default_bound_range(mle) for profiler in self.profilers]
-        for profiler, bound_range in zip(self.profilers, pbounds):
+            pbounds = [profiler.symmetric_bound_sets(mle) for profiler in self.profilers]
+        for profiler, bound_set in zip(self.profilers, pbounds):
             profile = {'s': [], 'w': []}
-            if bound_range is None:
-                bound_range = profiler._default_bound_range(mle)
-            for profile_p in bound_range:
-                plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
-                s, w = self.irls(mle['x'], p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=False, solver=profiler, weight_args=weight_args, **kwargs)
-                profile['s'].append(s)
-                profile['w'].append(w)
-            profiles.append({'ps': bound_range, 'pf': profile})
+            if bound_set is None:
+                bound_set = profiler.symmetric_bound_sets(mle)
+            for bound_range in bound_set:
+                init_x = mle['x']
+                for profile_p in bound_range:
+                    plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
+                    s, w = self.irls(init_x, p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=False, solver=profiler, weight_args=weight_args, **kwargs)
+                    if not restart:
+                        init_x = s['x']
+                    profile['s'].append(s)
+                    profile['w'].append(w)
+            profiles.append({'ps': bound_set, 'pf': profile})
         return profiles
 
     def gaussian_resample(self, mle, p, data, ws, objective, nsamples, reconfigure=False, **kwargs):
