@@ -171,6 +171,7 @@ class Solver(fitter.Solver):
         if weight_args is None:
             weight_args = {}
 
+        out_sol = None
         for i in range(nit):
             p_of_ws = p(weights, y)
             sol = solver(x0=x0, p=p_of_ws, **solver_args)
@@ -183,7 +184,9 @@ class Solver(fitter.Solver):
                     )
                     if controls[1] >= 1:
                         print("Step control adjusted", controls[1]+1, "times at iteration", i)
-                except Solver.StepControlError:
+                    out_sol = sol
+                except Solver.StepControlError as step_err:
+                    print(step_err)
                     print("Early termination at iteration", i+1, "due to divergence of objective function")
                     break
             else:
@@ -199,7 +202,7 @@ class Solver(fitter.Solver):
                 ctrl_hist.append(controls)
 
         if hist:
-            return sol, weights, sol_hist, w_hist, raw_sol_hist, ctrl_hist
+            return out_sol, weights, sol_hist, w_hist, raw_sol_hist, ctrl_hist
 
         return sol, weights
 
@@ -215,11 +218,11 @@ class Solver(fitter.Solver):
             residual = float(residual_function(x0))
             err = (residual - old_residual)#/(controls['gamma'] + abs(residual))
             # print(residual, old_residual, err)
-            if err < -controls['eps']:
+            if err < controls['eps']:
                 break
             x0 = (x0 + old_x) / 2
         else:
-            raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations")
+            raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations, minimum improvement gained was {err}.")
         return x0, residual, (err, i)
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, **kwargs):
@@ -242,6 +245,26 @@ class Solver(fitter.Solver):
             profiles.append({'ps': bound_set, 'pf': profile})
         return profiles
 
+    def _generate_gaussian_samples(self, mle, p, data, ws, objective, nsamples):
+        resampled_y0s = []
+        for i, (y, L) in enumerate(zip(data, objective._Ls)):
+            # sample gaussian with a given cholesky decomp of a precision matrix
+            L_real = ca.Function(f'Lreal{i}', [ca.vcat(objective.Ls), self.decision_vars], [L])(ws, mle['x'])
+            Z = random.standard_normal((L.size(1), nsamples))
+            # modelling y0 ~ y + N(0, G)
+            X = linsolve(L_real, Z)
+
+            resampled_y0s.append(X.T + y)
+        
+        return resampled_y0s
+
+    def _fit_samples(self, samples, x0, p, w0, **kwargs):
+        resample_sols = []
+        for i, sample in enumerate(zip(*samples)):
+            print("Fitting Sample", i)
+            resample_sols.append(self.irls(x0, p=p, y=sample, w0=w0, hist=False, **kwargs))
+        return resample_sols
+
     def gaussian_resample(self, mle, p, data, ws, objective, nsamples, reconfigure=False, **kwargs):
         """
         Inputs
@@ -263,18 +286,8 @@ class Solver(fitter.Solver):
             fitter.reconfig_rto(kwargs['model'], objective, self, kwargs['config'], index=index)
 
         # construct the y0s to refit
-        # modelling y0 ~ y + N(0, G)
-        resampled_y0s = []
-        for i, (y, L) in enumerate(zip(data, objective._Ls)):
-            # sample gaussian with a given cholesky decomp of a precision matrix
-            L_real = ca.Function(f'Lreal{i}', [ca.vcat(objective.Ls), self.decision_vars], [L])(ws, mle['x'])
-            Z = random.standard_normal((L.size(1), nsamples))
-            X = linsolve(L_real, Z)
+        resampled_y0s =  self._generate_gaussian_samples(mle, p, data, ws, objective, nsamples)
 
-            resampled_y0s.append(X.T + y)
-
-        resample_sols = []
-        for sample in zip(*resampled_y0s):
-            resample_sols.append(self.irls(mle['x'], p=p, y=sample, w0=ws, hist=False, **kwargs))
+        resample_sols = self._fit_samples(resampled_y0s, mle['x'], p, ws, **kwargs)
 
         return resample_sols, resampled_y0s
