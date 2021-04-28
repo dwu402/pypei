@@ -259,10 +259,15 @@ class Solver(fitter.Solver):
         return resampled_y0s
 
     def _fit_samples(self, samples, x0, p, w0, **kwargs):
-        resample_sols = []
-        for i, sample in enumerate(zip(*samples)):
-            print("Fitting Sample", i)
-            resample_sols.append(self.irls(x0, p=p, y=sample, w0=w0, hist=False, **kwargs))
+        try:
+            i = -1
+            resample_sols = []
+            for i, sample in enumerate(zip(*samples)):
+                print("Fitting Sample", i)
+                resample_sols.append(self.irls(x0, p=p, y=sample, w0=w0, hist=False, **kwargs))
+        except KeyboardInterrupt:
+            print("Stopped at iteration", i)
+            return resample_sols
         return resample_sols
 
     def gaussian_resample(self, mle, p, data, ws, objective, nsamples, reconfigure=False, **kwargs):

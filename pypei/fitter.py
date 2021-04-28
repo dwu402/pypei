@@ -36,13 +36,13 @@ class Solver():
 
         self._p_former = None
 
-        self.__default_solve_opts__ = ipopt_reduced
+        self.__default_solve_opts = ipopt_reduced
 
-        self.solve_opts = self.__default_solve_opts__
+        self.solve_opts = self.__default_solve_opts
 
         self.profilers = []
 
-        self.__evaluator__ = None
+        self.__evaluator = None
 
         if config:
             self.make(config)
@@ -84,11 +84,11 @@ class Solver():
         return self.solver(*args, **kwargs)
 
     def eval_at(self, x, p):
-        if not self.__evaluator__:
-            self.__evaluator__ = ca.Function('evaluator', 
+        if not self.__evaluator:
+            self.__evaluator = ca.Function('evaluator', 
                                            [self.decision_vars, self.parameters], 
                                            [self.objective_function])
-        return self.__evaluator__(x, p)
+        return self.__evaluator(x, p)
 
     @staticmethod
     def make_config(model, objective):
