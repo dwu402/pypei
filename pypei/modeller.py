@@ -73,10 +73,7 @@ class Model():
         if 'dphi' in configuration and configuration['dphi'] is not None:
             self.basis_jacobian = configuration['dphi'](self.observation_times) @ self.phi
         else:
-            bjac = ca.vcat(
-                [ca.diag(ca.jacobian(self.basis[:, i], self.ts))
-                for i in range(self.K)]
-                ).reshape((self.n, self.K))
+            bjac = ca.hcat([b.jacobian()(self.ts, bt) for b,bt in zip(self.basis_fns, ca.horzsplit(self.basis))])
             self.basis_jacobian = np.array(ca.Function('bjac', [self.ts], [bjac])(self.observation_times))
 
         # create the objects that define the smooth, model parameters
