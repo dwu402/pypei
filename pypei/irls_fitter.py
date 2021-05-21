@@ -264,7 +264,7 @@ class Solver(fitter.Solver):
             resample_sols = []
             for i, sample in enumerate(zip(*samples)):
                 print("Fitting Sample", i)
-                resample_sols.append(self.irls(x0, p=p, y=sample, w0=w0, hist=False, **kwargs))
+                resample_sols.append(self.irls(x0, p=p, y=sample, w0=w0, **kwargs))
         except KeyboardInterrupt:
             print("Stopped at iteration", i)
             return resample_sols

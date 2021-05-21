@@ -4,7 +4,26 @@ import casadi as ca
 from .functions import casbasis
 
 class Model():
-    """ B-spline basis representation of state """
+    """ B-spline basis representation of state 
+    
+    Configuration Options
+    ---------------------
+    grid_size : int : number of collocation points
+    basis_number : int : number of basis functions
+    model : callable : undelying model
+    model_form : dict : 
+        state : int : number of states in the underlying model
+        parameters : int : number of parameters in the underlying model
+    time_span : tuple <float> : start and end time of fitting window
+    knot_function : callable (optional) : knot location generator based on the data. Defaults to uniformly spaced knots
+    dataset : array (optional) : dataset to pass to knot_function
+    dphi : callable (optional) : User-input function to generate matrix representing the differential operator. Defaults to using exact derivative from casadi.
+
+    Notes
+    -----
+    model : has signature model(t, y, p) -> dydt. Inputs are (t) time/independent variable (y) state (p) model parameters
+    dphi: has signature dphi(t) -> D_t. Input is a list of collocation times in the fitting window
+    """
     def __init__(self, configuration=None):
         self.ts = None
         self.cs = None
@@ -27,26 +46,7 @@ class Model():
             self.generate_model(configuration)
 
     def generate_model(self, configuration):
-        """ Logic to construct a model, and smooth representation on BSpline basis 
-        
-        Configuration Options
-        ---------------------
-        grid_size : int : number of collocation points
-        basis_number : int : number of basis functions
-        model : callable : undelying model
-        model_form : dict : 
-            state : int : number of states in the underlying model
-            parameters : int : number of parameters in the underlying model
-        time_span : tuple <float> : start and end time of fitting window
-        knot_function : callable (optional) : knot location generator based on the data. Defaults to uniformly spaced knots
-        dataset : array (optional) : dataset to pass to knot_function
-        dphi : callable (optional) : User-input function to generate matrix representing the differential operator. Defaults to using exact derivative from casadi.
-
-        Notes
-        -----
-        model : has signature model(t, y, p) -> dydt. Inputs are (t) time/independent variable (y) state (p) model parameters
-        dphi: has signature dphi(t) -> D_t. Input is a list of collocation times in the fitting window
-        """
+        """ Logic to construct a model, and smooth representation on BSpline basis """
         self.n = configuration['grid_size']
         self.K = configuration['basis_number']
         self.s = configuration['model_form']['state']

@@ -1,6 +1,7 @@
 """ Interface for creating CasADi symbolics for weighted least squares """
 import numpy as np
 import casadi as ca
+from typing import Iterable
 
 def replace_nan(data_obj):
     """ Replaces nans with zeros, additionally returns locations of nans 
@@ -49,7 +50,7 @@ class Objective():
                ).reshape((-1, 1))
 
     @staticmethod
-    def _autoconfig_data(data: np.array, select: list = None) -> (dict, np.array):
+    def _autoconfig_data(data: np.array, select: list = None):
         """ Generates objective config components for data
 
         Creates an observation function that removes effects of nans in data"""
@@ -285,7 +286,7 @@ def map_order_to_L_struct(order, n_sz, inherent_order=None):
     ]
     """
 
-    if inherent_order == None:
+    if inherent_order is None:
         find = lambda i: i
     else:
         find = lambda i: inherent_order.index(i)
@@ -293,7 +294,7 @@ def map_order_to_L_struct(order, n_sz, inherent_order=None):
     struct = list()
     for x in order:
         elem = dict()
-        if hasattr(x, "__len__") and len(x) > 1:
+        if isinstance(x, Iterable) and len(x) > 1:
             elem['ns'] = []
             elem['i0s'] = []
             for i in x:
