@@ -185,4 +185,4 @@ class Problem():
             ax = f.add_subplot()
         ax.plot(self.model.observation_times, self.solver.get_state(solution['shist'][it], self.model))
         if data:
-            ax.plot(self.data_time, self.data_orig, 'o')
+            ax.plot(self.data_time, self.data_orig.T, 'o')
