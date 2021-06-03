@@ -228,8 +228,12 @@ class Objective():
         """ Returns the nth objective function object, without covariance scaling """
         return ca.sumsqr(self._y0s[i]-self.ys[i])
 
+    def obj_comp(self, i):
+        """ Returns the components of the nth objective function object"""
+        return self._Ls[i]@(self._y0s[i]-self.ys[i])
+
     def us_obj_comp(self, i):
-        """ Returns the components of the nth objective function object """
+        """ Returns the components of the nth objective function object, without covariance scaling """
         return self._y0s[i] - self.ys[i]
 
 def ignore_nan(data, casobj=None):
