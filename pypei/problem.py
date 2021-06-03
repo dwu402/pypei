@@ -15,6 +15,7 @@ class Problem():
         self.model_form: dict = None
         self.model_config: dict = None
         self.model: modeller.Model = None
+        self.model_dt = None
         
         self.data_orig = None
         self.data = None
@@ -53,10 +54,10 @@ class Problem():
         # deal with model weights
         for s in self.objective_config['L'][1]['struct']:
             if 'i0s' in s:
-                rs = ca.vcat([residuals[1][i0:i0+n] for n, i0 in zip(s['ns'], s['i0s'])])
+                rs = ca.vcat([residuals[1][i0:i0+n]/self.model_dt for n, i0 in zip(s['ns'], s['i0s'])])
                 ws.append(self.gaussian_w(rs, sum(s['ns'])))
             else:
-                ws.append(self.gaussian_w(residuals[1][s['i0']:s['i0']+s['n']], s['n']))
+                ws.append(self.gaussian_w(residuals[1][s['i0']:s['i0']+s['n']]/self.model_dt, s['n']))
         return ws
 
     def build_model(self, model_fn, model_form, time_span, grid_size=200, basis_number=40):
@@ -70,6 +71,7 @@ class Problem():
             'model': model_fn,
         }
         self.model = modeller.Model(self.model_config)
+        self.model_dt = np.gradient(self.model.observation_times)
 
     @staticmethod
     def slice_data(data_time, data, start=None, clip=None):
@@ -105,10 +107,11 @@ class Problem():
         """
         data_L = objective.Objective._autoconfig_L(self.data)
         objective.L_via_data(data_L, self.data_orig)
+        data_L['balance'] = True
         model_L = {
             'n': np.prod(self.model.xs.shape),
             'iid': False,
-            'balance': False,
+            'balance': True,
             'struct': objective.map_order_to_L_struct(**model_struct, n_sz=self.model_config['grid_size']),
             'numL': len(model_struct['order']),
         }
