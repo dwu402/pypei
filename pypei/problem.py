@@ -14,7 +14,7 @@ class Problem():
         self.model_function: Callable = None
         self.model_form: dict = None
         self.model_config: dict = None
-        self.model: modeller.Model = None
+        self.model: modeller.Model = modeller.Model()
         self.model_dt = None
         
         self.data_orig = None
@@ -27,7 +27,7 @@ class Problem():
         self.objective = objective.Objective()
 
         self.solver_config: dict = None
-        self.solver: irls_fitter.Solver = None
+        self.solver: irls_fitter.Solver = irls_fitter.Solver()
 
         self.weight_fn: Callable = None
 
@@ -37,6 +37,13 @@ class Problem():
         self.ubx = None
         self.lbg = None
         self.ubg = None    
+
+    def __str__(self):
+        return "pypei Problem:\n  " + "\n  ".join(
+            str(obj) for obj in [
+                self.model, self.objective, self.solver
+            ]
+        )
 
     @staticmethod
     def p(w, y):

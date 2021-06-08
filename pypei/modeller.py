@@ -45,6 +45,10 @@ class Model():
         if configuration is not None:
             self.generate_model(configuration)
 
+    def __str__(self):
+        nps = getattr(self.ps, "__len__", lambda : 0)
+        return f"pypei Model ({self.s} x {nps()}) -> ({self.K} x {self.n})"
+
     def generate_model(self, configuration):
         """ Logic to construct a model, and smooth representation on BSpline basis """
         self.n = configuration['grid_size']

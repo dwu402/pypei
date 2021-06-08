@@ -63,6 +63,10 @@ class Solver(fitter.Solver):
     def __call__(self, *args, **kwargs):
         self.irls(*args, **kwargs)
 
+    def __str__(self):
+        s = super().__str__()
+        return s.replace("Solver", "IRLS Solver")
+
     def make(self, config):
         """ Creates the solver
 

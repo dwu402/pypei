@@ -30,6 +30,10 @@ class Objective():
         if config:
             self.make(config)
 
+    def __str__(self):
+        y_szs = [x.shape for x in self.ys]
+        return f"pypei Objective {y_szs}"
+
     @staticmethod
     def _DATAFIT(model, obsv_fn=lambda x, p: x):
         """ Default data fit objective value

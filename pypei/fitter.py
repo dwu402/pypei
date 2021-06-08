@@ -47,6 +47,13 @@ class Solver():
         if config:
             self.make(config)
 
+    def __str__(self):
+        dv_sz = getattr(self.decision_vars, 'shape', None)
+        p_sz = getattr(self.parameters, 'shape', None)
+        g_sz = getattr(self.constraints, 'shape', None)
+        of_sz = getattr(self.objective_function, 'shape', None)
+        return f"pypei Solver wrt {dv_sz} s/t {g_sz} params {p_sz}"
+
     def make(self, config):
         """ Creates the solver
 
@@ -201,6 +208,7 @@ class Solver():
 class Profiler():
     """ Tightly bound sub-object of Solver """
     def __init__(self, solver, config):
+        self.constraint_var = config['g+']
         profile_constraint = ca.vcat([solver.constraints, config['g+']])
         self.p_locator = config.get('pidx', None)
         self.profiler = ca.nlpsol('solver', 'ipopt',
@@ -214,6 +222,9 @@ class Profiler():
 
     def __call__(self, *args, **kwargs):
         return self.profiler(*args, **kwargs)
+
+    def __str__(self):
+        return f"pypei Profiler {self.constraint_var}"
 
     def set_g(self, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
         """ Creates the constraint bounds from existing solver bounds """
