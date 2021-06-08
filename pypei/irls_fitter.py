@@ -173,6 +173,7 @@ class Solver(fitter.Solver):
 
         out_sol = None
         for i in range(nit):
+            print(f"Iteration: {i}")
             p_of_ws = p(weights, y)
             sol = solver(x0=x0, p=p_of_ws, **solver_args)
             if i > 0:
@@ -209,20 +210,30 @@ class Solver(fitter.Solver):
     class StepControlError(RuntimeError):
         pass
 
+    class StepControlWarning(RuntimeWarning):
+        pass
+
     @staticmethod
     def _irls_step_control(x0, residual_function, old_x, old_residual, controls):
         """ Step control for IRLS inspired by glm2.fit from R/CRAN
         """
 
-        for i in range(controls['maxiter']):
-            residual = float(residual_function(x0))
-            err = (residual - old_residual)#/(controls['gamma'] + abs(residual))
-            # print(residual, old_residual, err)
-            if err < controls['eps']:
-                break
-            x0 = (x0 + old_x) / 2
-        else:
-            raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations, minimum improvement gained was {err}.")
+        residual = float(residual_function(x0))
+        err = (residual - old_residual)/(controls['gamma'] + abs(residual))
+        i = 0
+
+        if err > -controls['eps']:
+            warnings.warn(f"Log-Likelihood is not improving: {err}", category=Solver.StepControlWarning)
+        # for i in range(controls['maxiter']):
+        #     residual = float(residual_function(x0))
+        #     err = (residual - old_residual)/(controls['gamma'] + abs(residual))
+        #     print(residual, old_residual, err)
+        #     if err < controls['eps']:
+        #         break
+        #     x0 = (x0 + old_x) / 2
+        # else:
+        #     raise Solver.StepControlError(f"Step control did not converge after {i+1} iterations, minimum improvement gained was {err}.")
+
         return x0, residual, (err, i)
 
     def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, hist=False, **kwargs):

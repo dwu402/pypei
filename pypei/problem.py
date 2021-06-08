@@ -54,10 +54,10 @@ class Problem():
         # deal with model weights
         for s in self.objective_config['L'][1]['struct']:
             if 'i0s' in s:
-                rs = ca.vcat([residuals[1][i0:i0+n]/self.model_dt for n, i0 in zip(s['ns'], s['i0s'])])
+                rs = ca.vcat([residuals[1][i0:i0+n] for n, i0 in zip(s['ns'], s['i0s'])])
                 ws.append(self.gaussian_w(rs, sum(s['ns'])))
             else:
-                ws.append(self.gaussian_w(residuals[1][s['i0']:s['i0']+s['n']]/self.model_dt, s['n']))
+                ws.append(self.gaussian_w(residuals[1][s['i0']:s['i0']+s['n']], s['n']))
         return ws
 
     def build_model(self, model_fn, model_form, time_span, grid_size=200, basis_number=40):
