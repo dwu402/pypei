@@ -1,4 +1,5 @@
 """ Interface to CasADi IPOPT interface and related UQ tools """
+import itertools
 import numpy as np
 import casadi as ca
 from scipy import stats
@@ -247,6 +248,18 @@ class Profiler():
         n = num//2 + 1
         return [np.linspace(mle_pval, (1-variance)*mle_pval, num=n, dtype=float).flatten(), 
                 np.linspace(mle_pval, (1+variance)*mle_pval, num=n, dtype=float).flatten(),]
+
+    @staticmethod
+    def is_nonmonotone_points(seq, reverse=False):
+        """ Returns a boolean array that takes value TRUE if the point is nonmonotonic """
+        return [reverse ^ any(x > xi for xi in seq[i+1:]) for i,x in enumerate(seq)]
+
+    @staticmethod
+    def resolve_seqs(ll_seq):
+        """ Returns root:subseq map of subsequences should be re-solved from root 
+        (due to monotonicity)"""
+        grps = map(lambda x:(x[0][0], len(x)), [list(l) for k,l in itertools.groupby(enumerate(ll_seq), key=lambda x:x[1]) if k])
+        return {(i+l): slice(i+l-1, i-1, -1) for i, l in grps}
 
 
 """

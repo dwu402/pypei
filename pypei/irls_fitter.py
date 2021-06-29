@@ -15,6 +15,7 @@ for i in 1..N; do
 import warnings
 import casadi as ca
 from functools import wraps
+from sortedcontainers import SortedDict
 from numpy import array, sqrt, inf, zeros, abs
 from numpy.linalg import norm as npnorm, solve as linsolve
 from numpy.random import default_rng
@@ -240,26 +241,55 @@ class Solver(fitter.Solver):
 
         return x0, residual, (err, i)
 
-    def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, hist=False, **kwargs):
+    def profile(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, repair=True, repair_iters=2, hist=False, **kwargs):
         profiles = []
-        if not pbounds:
+        if pbounds is None:
             pbounds = [profiler.symmetric_bound_sets(mle) for profiler in self.profilers]
         for profiler, bound_set in zip(self.profilers, pbounds):
-            profile = {'s': [], 'w': [], 'h': []}
+            profile = SortedDict()
             if bound_set is None:
                 bound_set = profiler.symmetric_bound_sets(mle)
             for bound_range in bound_set:
+                results = []
                 init_x = mle['x']
                 for profile_p in bound_range:
                     plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
                     s, w, *h = self.irls(init_x, p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=hist, solver=profiler, weight_args=weight_args, **kwargs)
+                    if profiler.profiler.stats()['return_status'] == 'Restoration_Failed':
+                        print("atttempt reverse step")
+                        # make a single attempt at repair here via a reverse step
+                        if len(results) > 1:
+                            init_x = results[-2][1]['s']['x']
+                            s, w, *h = self.irls(init_x, p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=hist, solver=profiler, weight_args=weight_args, **kwargs)
                     if not restart:
                         init_x = s['x']
-                    profile['s'].append(s)
-                    profile['w'].append(w)
-                    profile['h'].append(h)
-            profiles.append({'ps': bound_set, 'pf': profile})
+                    results.append((profile_p, {'s': s, 'w': w, 'h': h}))
+                profile.update(results)
+                # assume that profile is monotone decreasing along bound range
+                # only run when restart is False
+                if repair and not restart:
+                    print("starting repair")
+                    for _ in range(repair_iters):
+                        ll_seq = [x['s']['f'] for _, x in results]
+                        resolve_index = profiler.is_nonmonotone_points(ll_seq)
+                        new_solves = profiler.resolve_seqs(resolve_index)
+                        print(f"need to repair {new_solves}")
+                        for root, seq in new_solves.items():
+                            init_x = results[root][1]['s']['x']
+                            for seqi in range(*seq.indices(len(ll_seq))):
+                                profile_p,_ = results[seqi]
+                                plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
+                                s, w, *h = self.irls(init_x, p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=hist, solver=profiler, weight_args=weight_args, **kwargs)
+                                init_x = s['x']
+                                result_obj = {'s': s, 'w': w, 'h': h}
+                                results[seqi] = (profile_p, result_obj)
+                                profile[profile_p] = result_obj
+            profiles.append(profile)
         return profiles
+
+    def profile_v2(self,mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, repair=True, repair_iters=2, hist=False, **kwargs):
+        warnings.warn(f"This function is deprecated, use {type(self)}.profile instead.", category=DeprecationWarning)
+        return self.profile(mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, repair=True, repair_iters=2, hist=False, **kwargs)
 
     def _generate_gaussian_samples(self, mle, p, data, ws, objective, nsamples):
         resampled_y0s = []
