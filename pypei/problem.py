@@ -178,7 +178,7 @@ class Problem():
 
         if w0 is None:
             self.initial_weight = ([1] * self.objective_config['L'][0]['numL'] + 
-                                  [2e-2] * self.objective_config['L'][1]['numL'])
+                                   [1] * self.objective_config['L'][1]['numL'])
         else:
             self.initial_weight = w0
 
