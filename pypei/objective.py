@@ -23,6 +23,7 @@ class Objective():
         self._y0s = []
         self.Ls = []
         self._Ls = []
+        self._ws = []
 
         self.objective_function = None
         self.log_likelihood = None
@@ -44,14 +45,20 @@ class Objective():
         return obsv_fn(model.xs, model.ps).reshape((-1, 1))
 
     @staticmethod
-    def _MODELFIT(model):
+    def _MODELFIT(model, dt=True):
         """ Default model fit objective value
 
         Assuming form ||Dx- f(x,p)||^2, returns Dx-f(x,p)
         """
-        return (model.xdash - model.model(model.observation_times,
-                                          *model.cs, *model.ps)
-               ).reshape((-1, 1))
+        if dt:
+            return ((model.xdash - model.model(model.observation_times,
+                                                *model.cs, *model.ps)
+                    )*np.sqrt(np.gradient(model.observation_times))
+                    ).reshape((-1, 1))
+        else:
+            return (model.xdash - model.model(model.observation_times,
+                                            *model.cs, *model.ps)
+                   ).reshape((-1, 1))
 
     @staticmethod
     def _autoconfig_data(data: np.array, select: list = None):
@@ -169,7 +176,9 @@ class Objective():
             else:
                 L_base = ca.SX.eye(L['n'])
             if 'balance' in L and L['balance']:
-                L_base /= ca.sqrt(L_base.shape[0])
+                self._ws.append(1.0/L_base.shape[0])
+            else:
+                self._ws.append(1)
             if "iden" in L and L['iden']:
                 self._Ls.append(L_base)
                 continue
@@ -218,15 +227,15 @@ class Objective():
 
     def assemble_objective(self):
         """ (Re)builds the objective function from L, data and model components """
-        self.objective_function = sum(ca.sumsqr(L@(y0-y))
-                                      for L, y0, y in zip(self._Ls, self._y0s, self.ys))
-        self.log_likelihood = sum(ca.sumsqr(L@(y0-y))
+        self.objective_function = sum(w * ca.sumsqr(L@(y0-y))
+                                      for L, y0, y, w in zip(self._Ls, self._y0s, self.ys, self._ws))
+        self.log_likelihood = sum(w * ca.sumsqr(L@(y0-y))
                                   - 2*ca.sum1(ca.log(ca.diag(L)))
-                                  for L, y0, y in zip(self._Ls, self._y0s, self.ys))
+                                  for L, y0, y, w in zip(self._Ls, self._y0s, self.ys, self._ws))
 
     def obj_fn(self, i):
         """ Returns the nth objective function object """
-        return ca.sumsqr(self._Ls[i]@(self._y0s[i]-self.ys[i]))
+        return self._ws[i] * ca.sumsqr(self._Ls[i]@(self._y0s[i]-self.ys[i]))
 
     def us_obj_fn(self, i):
         """ Returns the nth objective function object, without covariance scaling """
