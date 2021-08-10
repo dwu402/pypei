@@ -30,6 +30,7 @@ class Problem():
         self.solver: irls_fitter.Solver = irls_fitter.Solver()
 
         self.weight_fn: Callable = None
+        self.weight_args: dict = None
 
         self.initial_guess = None
         self.initial_weight = None
@@ -66,6 +67,12 @@ class Problem():
             else:
                 ws.append(self.gaussian_w(residuals[1][s['i0']:s['i0']+s['n']], s['n']))
         return ws
+
+    def huber_weight(self, residuals, bounds):
+        proposal_weights = self.struct_weight_2(residuals)
+        lbnds, ubnds = zip(*bounds)
+        weights = [float(np.clip(w, lbnd, ubnd)) for w, lbnd, ubnd in zip(proposal_weights, lbnds, ubnds)]
+        return np.array(weights)
 
     def build_model(self, model_fn, model_form, time_span, grid_size=200, basis_number=40):
         self.model_function = model_fn
@@ -104,7 +111,7 @@ class Problem():
         self.data = data_filt
         self.interpolator = interpolator
 
-    def build_objective(self, model_struct):
+    def build_objective(self, model_struct, balance=True):
         """ Make an opinionated objective function 
         
         Does not regularise. Assumes form
@@ -114,11 +121,11 @@ class Problem():
         """
         data_L = objective.Objective._autoconfig_L(self.data)
         objective.L_via_data(data_L, self.data_orig)
-        data_L['balance'] = True
+        data_L['balance'] = balance
         model_L = {
             'n': np.prod(self.model.xs.shape),
             'iid': False,
-            'balance': True,
+            'balance': balance,
             'struct': objective.map_order_to_L_struct(**model_struct, n_sz=self.model_config['grid_size']),
             'numL': len(model_struct['order']),
         }
@@ -142,7 +149,7 @@ class Problem():
         self.objective = objective.Objective()
         self.objective.make(self.objective_config)
 
-    def build_solver(self, solver_opts=None, guess_opts=None, constraint_opts=None, w0=None):
+    def build_solver(self, solver_opts=None, guess_opts=None, constraint_opts=None, w0=None, weight_bounds=None):
         """ Build a Solver with opinionated initial guesses and error structures"""
         # make Solver object
         self.solver = irls_fitter.Solver(objective=self.objective)
@@ -175,6 +182,11 @@ class Problem():
         self.ubg = constraint_opts.get('ubg', 200_000)
 
         self.weight_fn = self.struct_weight_2
+        self.weight_args = None
+
+        if weight_bounds is not None:
+            self.weight_fn = self.huber_weight
+            self.weight_args = {'bounds': weight_bounds}
 
         if w0 is None:
             self.initial_weight = ([1] * self.objective_config['L'][0]['numL'] + 
@@ -185,7 +197,8 @@ class Problem():
     def solve(self, nit=6, hist=True):
         solution = self.solver.irls(self.initial_guess, p=self.p, y=self.data, nit=nit,
                                     lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg,
-                                    w0=self.initial_weight, weight=self.weight_fn, hist=hist)
+                                    w0=self.initial_weight, weight=self.weight_fn, 
+                                    weight_args=self.weight_args, hist=hist)
 
         return {k:v for k,v in zip(['sol', 'ws', 'shist', 'whist', 'raw_shist', 'ctrl_hist'], solution)}
 
