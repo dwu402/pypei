@@ -287,11 +287,11 @@ class Solver(fitter.Solver):
             profiles.append(profile)
         return profiles
 
-    def profile_v2(self,mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, repair=True, repair_iters=2, hist=False, **kwargs):
+    def profile_v2(self, mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, repair=True, repair_iters=2, hist=False, **kwargs):
         warnings.warn(f"This function is deprecated, use {type(self)}.profile instead.", category=DeprecationWarning)
-        return self.profile(mle, p=None, w0=None, nit=4, weight="gaussian", lbx=-inf, ubx=inf, lbg=-inf, ubg=inf, pbounds=None, weight_args=None, restart=False, repair=True, repair_iters=2, hist=False, **kwargs)
+        return self.profile(mle, p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, pbounds=pbounds, weight_args=weight_args, restart=restart, repair=repair, repair_iters=repair_iters, hist=hist, **kwargs)
 
-    def _generate_gaussian_samples(self, mle, p, data, ws, objective, nsamples):
+    def _generate_gaussian_samples(self, mle, data, ws, objective, nsamples):
         resampled_y0s = []
         for i, (y, L) in enumerate(zip(data, objective._Ls)):
             # sample gaussian with a given cholesky decomp of a precision matrix
@@ -337,7 +337,7 @@ class Solver(fitter.Solver):
             fitter.reconfig_rto(kwargs['model'], objective, self, kwargs['config'], index=index)
 
         # construct the y0s to refit
-        resampled_y0s =  self._generate_gaussian_samples(mle, p, data, ws, objective, nsamples)
+        resampled_y0s =  self._generate_gaussian_samples(mle, data, ws, objective, nsamples)
 
         resample_sols = self._fit_samples(resampled_y0s, mle['x'], p, ws, **kwargs)
 
