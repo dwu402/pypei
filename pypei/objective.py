@@ -232,6 +232,9 @@ class Objective():
         self.log_likelihood = sum(w * ca.sumsqr(L@(y0-y))
                                   - 2*ca.sum1(ca.log(ca.diag(L)))
                                   for L, y0, y, w in zip(self._Ls, self._y0s, self.ys, self._ws))
+        self.unweighted_log_likelihood = sum(ca.sumsqr(L@(y0-y))
+                                             - 2*ca.sum1(ca.log(ca.diag(L)))
+                                             for L, y0, y in zip(self._Ls, self._y0s, self.ys))
 
     def obj_fn(self, i):
         """ Returns the nth objective function object """
