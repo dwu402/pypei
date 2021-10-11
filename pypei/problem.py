@@ -111,7 +111,7 @@ class Problem():
         self.data = data_filt
         self.interpolator = interpolator
 
-    def build_objective(self, model_struct, balance=True):
+    def build_objective(self, model_struct, balance=True, *args):
         """ Make an opinionated objective function 
         
         Does not regularise. Assumes form
@@ -146,10 +146,13 @@ class Problem():
                 model_L,
             ]
         }
+        for y, l in args:
+            self.objective_config['Y'].append(y)
+            self.objective_config['L'].append(l)
         self.objective = objective.Objective()
         self.objective.make(self.objective_config)
 
-    def build_solver(self, solver_opts=None, guess_opts=None, constraint_opts=None, w0=None, weight_bounds=None):
+    def build_solver(self, solver_opts=None, guess_opts=None, constraint_opts=None, w0=None, weight_fn=None, weight_bounds=None):
         """ Build a Solver with opinionated initial guesses and error structures"""
         # make Solver object
         self.solver = irls_fitter.Solver(objective=self.objective)
@@ -187,6 +190,9 @@ class Problem():
         if weight_bounds is not None:
             self.weight_fn = self.huber_weight
             self.weight_args = {'bounds': weight_bounds}
+
+        if weight_fn is not None:
+            self.weight_fn = weight_fn
 
         if w0 is None:
             self.initial_weight = ([1] * self.objective_config['L'][0]['numL'] + 
