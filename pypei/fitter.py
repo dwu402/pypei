@@ -35,6 +35,8 @@ class Solver():
         self.decision_vars = None
         self.parameters = None
 
+        self._solver = None
+
         self._p_former = None
 
         self.__default_solve_opts = ipopt_reduced
@@ -75,6 +77,8 @@ class Solver():
             self.solve_opts = config['o']
 
         self.construct()
+        if self._solver is None:
+            self._solver = self.solver
 
     def construct(self):
         self.solver = ca.nlpsol(
