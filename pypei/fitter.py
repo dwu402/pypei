@@ -215,6 +215,7 @@ class Profiler():
     def __init__(self, solver, config):
         self.constraint_var = config['g+']
         profile_constraint = ca.vcat([solver.constraints, config['g+']])
+        self.nnz = config['g+'].nnz()
         self.p_locator = config.get('pidx', None)
         self.profiler = ca.nlpsol('solver', 'ipopt',
                                   {
@@ -223,35 +224,78 @@ class Profiler():
                                       'g': profile_constraint,
                                       'p': solver.parameters,
                                   },
-                                  solver.solve_opts)
-
+                                  solver.solve_opts,
+                                 )
+        
     def __call__(self, *args, **kwargs):
         return self.profiler(*args, **kwargs)
 
-    def __str__(self):
-        return f"pypei Profiler {self.constraint_var}"
-
     def set_g(self, bnd_value, lbg_v=-np.inf, ubg_v=np.inf):
         """ Creates the constraint bounds from existing solver bounds """
-        # exploiting structure of Casadi.IpoptInterface
         gsz = self.profiler.size_in(4)
-        lbg = np.ones(gsz)
-        ubg = np.ones(gsz)
-        lbg[:-1] = lbg_v
-        ubg[:-1] = ubg_v
-        lbg[-1] = bnd_value
-        ubg[-1] = bnd_value
+        lbg = np.ones(gsz).flatten()
+        ubg = np.ones(gsz).flatten()
+        lbg[:-self.nnz] = lbg_v
+        ubg[:-self.nnz] = ubg_v
+        lbg[-self.nnz:] = bnd_value
+        ubg[-self.nnz:] = bnd_value
         return lbg, ubg
 
     def _default_bound_range(self, mle, num=21, variance=0.5):
+        """ Generates a range of bounds from (1-v)*m to (1+v)*m 
+
+        where v is the variance parameter
+        and m is the value of the profiler constraint at the MLE
+
+        Works for 1D only.
+        """
         mle_pval = self.p_locator(mle['x'])
         return np.linspace((1-variance)*mle_pval, (1+variance)*mle_pval, num=num, dtype=float).flatten()
 
+    def simple_nvariate_bound_sets(self, mle, num=21, variance=0.5):
+        """  Generates a range of bounds from (1-v)*m to (1+v)*m 
+
+        where v is the variance parameter
+        and m is the value of the profiler constraint at the MLE
+        """
+        mle_pval = self.p_locator(mle['x'])
+        bound_range = np.linspace((1-variance)*mle_pval, (1+variance)*mle_pval, num)
+        bound_meshgrids = np.meshgrid(*bound_range.T)
+        bound_xs = list(zip(*[mesh.flatten() for mesh in bound_meshgrids]))
+        return bound_xs
+
     def symmetric_bound_sets(self, mle, num=21, variance=0.5):
+        """ Generates two bound ranges which are symmetric about the MLE value
+
+        They start at the MLE and go towards the extremes of (1-v)*m and (1+v)*m
+        where v is the variance parameter
+        and m is the value of the profiler constraint at the MLE
+
+        Works for 1D only.
+        """
         mle_pval = self.p_locator(mle['x'])
         n = num//2 + 1
         return [np.linspace(mle_pval, (1-variance)*mle_pval, num=n, dtype=float).flatten(), 
                 np.linspace(mle_pval, (1+variance)*mle_pval, num=n, dtype=float).flatten(),]
+
+    def symmetric_nvariate_bound_sets(self, mle, num=21, variance=0.5):
+        """ Generates four bound ranges which are symmetric about the MLE value
+
+        They start at the MLE and traverse each quadrant in a snake-like manner.
+        Curently only does a square grid.
+        """
+        mle_pval = self.p_locator(mle['x']).toarray().flatten()
+        n = num//2 + 1
+
+        mle_hilo = [((x, 1), (x, -1)) for x in mle_pval]
+
+        bound_sets = []
+        for (xm, xv), (ym, yv) in itertools.product(*mle_hilo):
+            x_arr = np.linspace(xm, xm*(1+ xv*variance), n)
+            y_arr = np.linspace(ym, ym*(1+ yv*variance), n)
+            Xgrid, Ygrid = np.meshgrid(x_arr, y_arr)
+            bound_sets.append(list(zip(self.diag_mat(Xgrid), self.diag_mat(Ygrid))))
+        return bound_sets
 
     @staticmethod
     def is_nonmonotone_points(seq, reverse=False):
@@ -264,6 +308,42 @@ class Profiler():
         (due to monotonicity)"""
         grps = map(lambda x:(x[0][0], len(x)), [list(l) for k,l in itertools.groupby(enumerate(ll_seq), key=lambda x:x[1]) if k])
         return {(i+l): slice(i+l-1, i-1, -1) for i, l in grps}
+
+    @staticmethod
+    def concave_up(seq):
+        """ Returns whether inner points of a sequence are concave up 
+        Outer points automatically resolve to True"""
+        return [True] + [float(f1/2 - f2 + f3/2) > 0 for f1,f2,f3 in zip(seq[:-2], seq[1:-1], seq[2:])] + [True]
+
+    @staticmethod
+    def diag_mat(mat, n=None):
+        """Diagoanlly traverses through a matrix
+        
+        Adapted from an implementatation found on geeksforgeeks
+        """
+        if n is None:
+            n = mat.shape[0]
+        mode = 0
+        it = 0
+        lower = 0
+
+        # 2n will be the number of iterations
+        for t in range(2 * n - 1):
+            t1 = t
+            if (t1 >= n):
+                mode += 1
+                t1 = n - 1
+                it -= 1
+                lower += 1
+            else:
+                lower = 0
+                it += 1
+
+            for i in range(t1, lower - 1, -1):
+                if ((t1 + mode) % 2 == 0):
+                    yield mat[i, t1 + lower - i]
+                else:
+                    yield mat[t1 + lower - i, i]
 
 
 """

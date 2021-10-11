@@ -83,7 +83,7 @@ class Solver(fitter.Solver):
         super().make(config)
         # keyword filter the solver
         if isinstance(self.solver, ca.casadi.Function):
-        self._solver = self.solver
+            self._solver = self.solver
 
         @wraps(self._solver)
         def solver(*args, **kwargs):
