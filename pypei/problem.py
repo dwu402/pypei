@@ -215,3 +215,12 @@ class Problem():
         ax.plot(self.model.observation_times, self.solver.get_state(solution['shist'][it], self.model))
         if data:
             ax.plot(self.data_time, self.data_orig.T, 'o')
+
+    def do_profile(self, profiler, mle_sol, mle_w, bound_set, nit=1, hist=False, repair=False):
+        self.solver.profilers = [profiler]
+        return self.solver.profile(mle_sol, w0=mle_w, pbounds=[bound_set],
+                                   nit=nit, hist=hist, repair=repair,
+                                   p=self.p, y=self.data,
+                                   weight=self.weight_fn, weight_args=self.weight_args,
+                                   lbx=self.lbx, ubx=self.ubx, 
+                                   lbg=self.lbg, ubg=self.ubg)
