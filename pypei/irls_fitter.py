@@ -257,7 +257,7 @@ class Solver(fitter.Solver):
                 for profile_p in bound_range:
                     plbg, pubg = profiler.set_g(profile_p, lbg_v=lbg, ubg_v=ubg)
                     s, w, *h = self.irls(init_x, p=p, w0=w0, nit=nit, weight=weight, lbx=lbx, ubx=ubx, lbg=plbg.flatten(), ubg=pubg.flatten(), hist=hist, solver=profiler, weight_args=weight_args, **kwargs)
-                    if profiler.profiler.stats()['return_status'] == 'Restoration_Failed':
+                    if repair and profiler.profiler.stats()['return_status'] == 'Restoration_Failed':
                         print("atttempt reverse step")
                         # make a single attempt at repair here via a reverse step
                         if len(results) > 1:
