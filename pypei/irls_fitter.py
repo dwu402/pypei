@@ -306,13 +306,16 @@ class Solver(fitter.Solver):
         
         return resampled_y0s
 
-    def _fit_samples(self, samples, x0, p, w0, **kwargs):
+    def _fit_samples(self, samples, x0, p, w0, must_converge=False, **kwargs):
         try:
             i = -1
             resample_sols = []
             for i, sample in enumerate(zip(*samples)):
                 print("Fitting Sample", i)
-                resample_sols.append(self.irls(x0, p=p, y=sample, w0=w0, **kwargs))
+                sample_sol = self.irls(x0, p=p, y=sample, w0=w0, **kwargs)
+                if must_converge and self._solver.stats()['return_status'] != 'Solve_Succeeded':
+                    continue
+                resample_sols.append(sample_sol)
         except KeyboardInterrupt:
             print("Stopped at iteration", i)
             return resample_sols
