@@ -177,6 +177,8 @@ class Objective():
                 L_base = ca.SX.eye(L['n'])
             if 'balance' in L and L['balance']:
                 self._ws.append(1.0/L_base.shape[0])
+            elif 'w' in L:
+                self._ws.append(L['w'])
             else:
                 self._ws.append(1)
             if "iden" in L and L['iden']:
