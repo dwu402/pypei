@@ -88,9 +88,16 @@ class Model():
         self.ps = [ca.SX.sym("p_"+str(i)) for i in range(n_ps)]
 
         # model function derived from input model function
+        model_fn = configuration.get('model', None)
+        if model_fn is not None:
+            self.make_model(model_fn)
+
+    def make_model(self, model_fn):
+        model_output = [model_fn(self.tssx[i], self.xs[i,:], ca.vcat(self.ps)).reshape((1, -1))
+                        for i in range(self.n)]
         self.model = ca.Function("model",
                                  [self.tssx, *self.cs, *self.ps],
-                                 [ca.hcat(configuration['model'](self.tssx, self._xs, self.ps))])
+                                 [ca.vcat(model_output)])
 
     def get_x(self, *cs):
         """ Exposes calculation of state from given spline coefficients"""
