@@ -224,3 +224,9 @@ class Problem():
                                    weight=self.weight_fn, weight_args=self.weight_args,
                                    lbx=self.lbx, ubx=self.ubx, 
                                    lbg=self.lbg, ubg=self.ubg)
+
+    def get_parameters(self, sol_obj):
+        return self.solver.get_parameters(sol_obj, self.model)
+
+    def get_state(self, sol_obj):
+        return self.solver.get_state(sol_obj, self.model)
