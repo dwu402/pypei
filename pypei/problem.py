@@ -167,8 +167,12 @@ class Problem():
         x0 = self.solver.proto_x0(self.model)
         x0x0 = x0['x0']
         n_ps = self.model_form['parameters']
-        x0x0[:-n_ps] = np.random.poisson(x0x0[:-n_ps] * guess_opts.get('x0', 10_000))
-        x0x0[-n_ps:] = x0x0[-n_ps:] * guess_opts.get('p0', 0.2)
+        # x0x0[:-n_ps] = np.random.poisson(x0x0[:-n_ps] * guess_opts.get('x0', 10_000))
+        guess_x0 = guess_opts.get('x0', 10_000)
+        x0x0[:-n_ps] = np.random.normal(x0x0[:-n_ps] * guess_x0/2, guess_x0/10)
+        # x0x0[-n_ps:] = x0x0[-n_ps:] * guess_opts.get('p0', 0.2)
+        guess_p0 = guess_opts.get('p0', 0.2)
+        x0x0[-n_ps:] = np.random.normal(x0x0[-n_ps:] * guess_p0, guess_p0/10)
         self.initial_guess = x0x0
 
         if constraint_opts is None:
@@ -224,3 +228,17 @@ class Problem():
                                    weight=self.weight_fn, weight_args=self.weight_args,
                                    lbx=self.lbx, ubx=self.ubx, 
                                    lbg=self.lbg, ubg=self.ubg)
+
+    def loglikelihood(self, x, w):
+        return float(self.solver.residual(x, self.p(w, self.data)))
+
+    def default_profilers(self):
+        configs = self.solver._profiler_configs(self.model)
+        profilers = [fitter.Profiler(self.solver, config) for config in configs]
+        return profilers
+
+    def get_parameters(self, x):
+        return self.solver.get_parameters(x, self.model)
+
+    def get_state(self, x):
+        return self.solver.get_state(x, self.model)
