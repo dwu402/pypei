@@ -20,11 +20,11 @@ from numpy import array, sqrt, inf, zeros, abs
 from numpy.linalg import norm as npnorm, solve as linsolve
 from numpy.random import default_rng
 from . import fitter
+from .objective import Objective
 from .functions.misc import func_kw_filter
 
 random = default_rng()
 
-@func_kw_filter
 def _gaussian_weight_function(residuals, n_obsv):
     """ Gaussian weights for pypei.Objective 
     We know that the weights are 1/sigma and that sigma^2 = f/n
@@ -32,7 +32,6 @@ def _gaussian_weight_function(residuals, n_obsv):
     # TODO: determine if n_obsv is available automatically
     return 1/sqrt([float(ca.sumsqr(r))/n for r,n in zip(residuals, n_obsv)])
 
-@func_kw_filter
 def _gaussian_inverse_weight_function(weights):
     """ Mapping from weights to variance """
     return 1/array(weights)**2
@@ -55,10 +54,10 @@ class Solver(fitter.Solver):
     In the pypei objective strucutre, these weights correspond to the inverse of
     the square root of the determinant of the variance.
     """
-    def __init__(self, objective=None, *args, **kwargs):
+    def __init__(self, objective: Objective=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # need to assign later if not given here, used for irls algorithm weights
-        self.objective_obj = objective
+        self.objective_obj: Objective = objective
         self.residual_function = None
 
     def __call__(self, *args, **kwargs):
@@ -88,17 +87,20 @@ class Solver(fitter.Solver):
         @wraps(self._solver)
         def solver(*args, **kwargs):
             return self._solver(*args, **{k:v for k,v in kwargs.items() 
-                                          if k in self._solver.name_in()})
+                                        if k in self._solver.name_in()})
         self.solver = solver
         # from knowing the general form of the objective function, we can deduce
         # that the weights will be tied to the unweighted components (residuals)
         self.residual = ca.Function("residual",
                                     [self.decision_vars, self.parameters],
                                     [self.objective_obj.log_likelihood])
-        self.component_residuals = ca.Function("mu",
+        self.component_residuals = ca.Function("dev",
                                                [self.decision_vars, self.parameters],
                                                [self.objective_obj.us_obj_comp(i)
                                                 for i in range(len(self.objective_obj.ys))])
+        self.current_mean = ca.Function('mu',
+                                        [self.decision_vars, self.parameters],
+                                        self.objective_obj.ys)
 
     @staticmethod
     def _default_p(ws, data):
@@ -150,8 +152,10 @@ class Solver(fitter.Solver):
             assert weight in _known_weight_functions, \
                 f"Weight function type <{weight}> not understood."
             weight_fn = _known_weight_functions[weight]
+            weight_fn = func_kw_filter(weight_fn)
         else:
-            weight_fn = weight
+            weight_fn = func_kw_filter(weight)
+
         
         if w0 is None:
             weights = [1] * ca.vcat(self.objective_obj.Ls).numel()
@@ -178,7 +182,7 @@ class Solver(fitter.Solver):
         if weight_args is None:
             weight_args = {}
 
-        out_sol = None
+        sol = None
         for i in range(nit):
             print(f"Iteration: {i}")
             p_of_ws = p(weights, y)
@@ -192,7 +196,7 @@ class Solver(fitter.Solver):
                     )
                     if controls[1] >= 1:
                         print("Step control adjusted", controls[1]+1, "times at iteration", i)
-                    out_sol = sol
+                    # out_sol = sol
                 except Solver.StepControlError as step_err:
                     print(step_err)
                     print("Early termination at iteration", i+1, "due to divergence of objective function")
@@ -201,8 +205,12 @@ class Solver(fitter.Solver):
                 x0 = sol['x'].toarray().flatten()
                 residual = float(self.residual(x0, p_of_ws))
                 controls = (None, None)
+            sol.update(self._solver.stats())
             component_residuals = self.component_residuals(x0, p_of_ws)
-            weights = weight_fn(residuals=component_residuals, **weight_args)
+            weights = weight_fn(residuals=component_residuals, 
+                                current_ws=weights, 
+                                current_mu=self.current_mean(x0, p_of_ws),
+                                **weight_args)
             if hist:
                 raw_sol_hist.append(sol)
                 sol_hist.append({'x': x0, 'f': residual})
@@ -210,7 +218,7 @@ class Solver(fitter.Solver):
                 ctrl_hist.append(controls)
 
         if hist:
-            return out_sol, weights, sol_hist, w_hist, raw_sol_hist, ctrl_hist
+            return sol, weights, sol_hist, w_hist, raw_sol_hist, ctrl_hist
 
         return sol, weights
 

@@ -71,8 +71,8 @@ class Model():
         self.tssx = ca.SX.sym("t", self.n, 1)
 
         # define basis matrix and gradient matrix
-        phi = ca.Function('phi', [self.ts], [self.basis])
-        self.phi = np.array(phi(self.observation_times))
+        self.phi_fn = ca.Function('phi', [self.ts], [self.basis])
+        self.phi = np.array(self.phi_fn(self.observation_times))
 
         if 'dphi' in configuration and configuration['dphi'] is not None:
             self.basis_jacobian = configuration['dphi'](self.observation_times) @ self.phi
